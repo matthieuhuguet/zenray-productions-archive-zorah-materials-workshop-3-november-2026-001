@@ -1,0 +1,71 @@
+# Bilan : pourquoi ChatGPT rend parfois une height éclairée (3 November 2026)
+
+Images analysées : `Sources/artstation-eRZ01X/textures/ai-gen/aigen1.png` à `aigen6.png`. L'image `aigen5` est apparue dans le dossier pendant l'analyse, elle compte comme exemple supplémentaire. Outils : `Scripts/AnalyseAiHeights.py`, `Scripts/JointProfiles.py` et le vérificateur `/Users/zenray/.claude/skills/zenray-houdini/scripts/height/CheckAiHeight.py`. Figures : `board.png` (masques), `joint_profiles.png` (coupes), `studio_light_cone.png` (lumière moyenne des rendus Zorah). Données : `metrics.json`, `joint_profiles.json`.
+
+## 1. Le poids du fichier ne mesure pas la qualité
+
+| Image | Format | Signature | Détail fin réel | Résultat |
+|---|---|---|---|---|
+| aigen1 | 4096 px, 16 bits gris, 27,9 Mo | aucune, conversion par script | nul au-delà d'un tiers de la résolution : agrandie | height juste |
+| aigen2 | 4096 px, 16 bits gris, 26,7 Mo | aucune | nul : agrandie | height juste |
+| aigen3 | 1254 px, 8 bits RGB, 3,7 Mo | ChatGPT gpt-image, C2PA | natif | éclairée |
+| aigen4 | 1254 px, 8 bits RGB, 3,6 Mo | ChatGPT gpt-image, C2PA | natif | éclairée |
+| aigen5 | 4096 px, 16 bits gris, 28,4 Mo | aucune | nul : agrandie | éclairée |
+| aigen6 | 1254 px, 8 bits RGB, 4,0 Mo | ChatGPT gpt-image, C2PA | faible | éclairée |
+
+L'écart de poids vient du conteneur et non de la nuance. Une image de 4096 px en 16 bits pèse 32 Mio avant compression, tandis qu'une image de 1254 px en 8 bits RGB n'en pèse que 4,5. Les fichiers de 4096 px n'apportent aucun détail qu'une image de 1254 px ne contiendrait déjà. La part de puissance au-delà d'un tiers de la résolution y vaut 0,000, contre 0,08 à 0,10 pour les images natives. Ces fichiers ne portent pas non plus la signature C2PA d'OpenAI. Ils ont donc été convertis après la génération par un script, probablement l'outil Python de ChatGPT quand le prompt demande 4096 et 16 bits, ce qui reste à vérifier dans la conversation. L'image `aigen5` sert de contre-exemple : elle pèse 28 Mo et reste éclairée.
+
+## 2. Ce qui sépare les réussites des échecs : la matière
+
+Les deux réussites sont des bétons sans arête, dont les seuls détails sont des pores. Or un pore paraît sombre qu'il soit éclairé ou non, si bien que rien ne trahit la lumière. Les échecs ont tous des arêtes : des blocs pour 3 et 4, des traces d'outil pour 5, des strates pour 6. Le modèle dessine alors chaque arête comme sur une photo, c'est-à-dire éclairée.
+
+## 3. Les mesures, calibrées dans les deux sens
+
+| Mesure | aigen1 | aigen2 | aigen3 | aigen4 | aigen5 | aigen6 | height synthétique | même height éclairée |
+|---|---|---|---|---|---|---|---|---|
+| part claire des extrêmes | 0,07 | 0,04 | 0,54 | 0,33 | 0,34 | 0,25 | 0,05 | 0,25 |
+| cohérence clair et sombre | 0,05 | 0,05 | 0,08 | 0,51 | 0,06 | 0,30 | 0,03 | 0,63 |
+| asymétrie de la coupe des joints | sans joint | sans joint | trait blanc sous le joint | -0,18 | sans joint | -0,11 | 0,00 | -0,31 |
+| saut au raccord | 0,00 | 0,23 | 6,20 | 3,96 | 0,13 | 0,00 | | |
+| vérificateur | OK | OK | REDO | REDO | REDO | REDO | OK | REDO |
+
+La **part claire** compte, parmi les pixels les plus extrêmes du relief local, ceux qui sont clairs. Dans une height de pierre, les extrêmes sont des creux, donc sombres. Une lumière y ajoute des liserés blancs. La **cohérence** dit si chaque liseré clair se trouve du même côté de son ombre : elle vaut 0 au hasard et 1 si tous sont orientés pareil, ce que produit une lampe unique. La **coupe des joints** fait la moyenne du profil à travers les joints horizontaux : une height donne un creux symétrique, alors qu'une lumière venue du haut ajoute un pic clair d'un seul côté. Chaque mesure a été vérifiée sur une height synthétique de blocs, puis sur la même height éclairée par nous. Une première mesure de troisième ordre avait échoué à cette calibration et a été écartée.
+
+## 4. Les trois erreurs, nommées
+
+1. **Éclairage rasant cuit** (en anglais *baked lighting* ou *shaded relief*) : chaque arête devient un couple clair et sombre orienté d'une seule direction. C'est le cas de aigen4 (cohérence 0,51) et de aigen6 (0,30), avec la même direction, du haut pour des joints en creux, comme le spot des rendus Zorah.
+2. **Joints dessinés en blanc**, à la manière d'une carte de curvature ou d'usure des arêtes : aigen3 (part claire 0,54, les pixels clairs dominent) et les traits embossés de aigen5 (0,34). Dans une height, un trait blanc est une crête : le mortier sortirait du mur au lieu de s'y creuser.
+3. **Teinte prise pour du relief** (fuite de l'albédo) : les blocs de aigen4 n'ont pas tous le même gris, la variation de basse fréquence y est la plus forte (0,13), et la couleur des pierres devient une hauteur. C'est une hypothèse appuyée par l'image et par cette mesure, sans démonstration stricte. Pour la même raison, la corrélation de aigen3 avec le cône de lumière moyen du studio (+0,65) reste un indice, car une carte de basse fréquence a trop peu de degrés de liberté pour constituer une preuve.
+
+S'y ajoute un défaut de raccord : aigen3 et aigen4 sautent aux bords, de 4 à 6 fois l'écart entre deux colonnes voisines, alors que 1, 2, 5 et 6 raccordent.
+
+## 5. Pourquoi le modèle fait ces erreurs
+
+La référence est un rendu de présentation éclairé, avec un spot venu du haut et une lumière rasante. Or le prompt demandait de « respecter la référence », ce qui revient à en garder l'aspect, lumière comprise. Le prompt définissait ensuite la height par la seule règle « blanc = haut, noir = creux ». Cette règle n'interdit pas un biseau éclairé, puisqu'une arête éclairée du haut est aussi « blanche en haut ». Il lui manquait la règle qui distingue une height d'une lumière : la valeur d'un pixel dépend de l'altitude et jamais de la pente. Un modèle d'image a de plus appris le « mur de pierre en gris » surtout sur des photos et des rendus. Faute de polarité donnée à chaque détail, il choisit l'image la plus fréquente, avec des arêtes éclairées. Quant aux mots « 16 bits » et « 4096 », le modèle d'image ne les exécute pas : il livre 1254 px en 8 bits, et toute version plus grande est une conversion qui n'ajoute rien.
+
+## 6. Le prompt v2 et ce que chaque clause corrige
+
+Texte complet dans `PROMPT_V2.txt` et dans `Prompts/height-prompt-zorah.md`.
+
+- « rendu de présentation éclairé : n'en garder que la forme [...], jamais ses valeurs de gris ni sa lumière » remplace « respecter la référence », qui faisait recopier le spot.
+- « chaque pixel code uniquement l'altitude [...], jamais sa pente ni son orientation » est la définition qui manquait. Une lumière dépend de la pente, une height de l'altitude : cette phrase interdit le liseré à la racine.
+- « en creux : [...] ; en relief : [...] » donne la polarité de chaque détail. Sans elle, les joints sont sortis en blanc (aigen3).
+- « plateau presque uniforme » et « les taches [...] ne créent aucun relief » coupent la fuite de la teinte (aigen4).
+- « profil symétrique, sans trait clair sur aucun de ses bords » décrit en positif ce que la coupe des joints mesure.
+- « même gris moyen dans les quatre quarts » coupe le cône de lumière.
+- « retournée de 180 degrés reste une height juste » est un test que seule une vraie height réussit, car un relief éclairé, retourné, paraît se creuser.
+- Les exclusions s'enrichissent de la direction de lumière, du biseau, de l'emboss et de la curvature.
+- « 4096 × 4096 » et « 16 bits » sortent du prompt, puisque le modèle ne les exécute pas. La conversion se fait ensuite, dans Houdini ou par script.
+
+## 7. Le contrôle automatique pour la boucle de génération
+
+```bash
+/Users/zenray/.venvs/shorts/bin/python -I /Users/zenray/.claude/skills/zenray-houdini/scripts/height/CheckAiHeight.py --selftest
+/Users/zenray/.venvs/shorts/bin/python -I /Users/zenray/.claude/skills/zenray-houdini/scripts/height/CheckAiHeight.py <height.png>
+```
+
+Le code de sortie vaut 0 pour une vraie height et 1 pour une image à refaire, avec la raison en clair. Les seuils sont réunis dans le dictionnaire `P` : part claire 0,15, cohérence 0,15, raccord 1,5. Ils restent provisoires, mesurés sur six images et trois calibrations. Une vraie height qui porte de réels reliefs saillants, comme des clous, un mortier en saillie ou des clins en dents de scie, peut dépasser la part claire sans être éclairée. Il faudra alors regarder l'image avant de refaire.
+
+## 8. Solution validée (3 November 2026, 19:56 +0100)
+
+Matthieu a trouvé la solution en testant : il envoie les deux prompts simples ensemble, la génération d'image puis le calcul Python, dans un seul message. Le résultat est une height quasi parfaite. Texte exact : `PROMPT_FINAL.txt`. Il semble que le calcul Python, parti des pixels, garde les positions et tous les détails, tandis que la consigne de génération fixe ce qu'est une height. Cette explication reste une hypothèse ; le constat, lui, est celui de Matthieu.

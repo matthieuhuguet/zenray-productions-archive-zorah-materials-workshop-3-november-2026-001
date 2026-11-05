@@ -1,0 +1,53 @@
+{
+ "entrée": {
+  "gap": 29.3,
+  "means": [
+   98.9,
+   99.2,
+   140.4
+  ]
+ },
+ "lumière principale p75 de la référence": {
+  "target_mean_srgb_derived": 121.7,
+  "gap": 5.94,
+  "means": [
+   121.7,
+   121.7,
+   121.7
+  ],
+  "outside_pbr_range": [
+   0.007,
+   0.0052,
+   0.0015
+  ]
+ },
+ "lumière principale p90 de la référence": {
+  "target_mean_srgb_derived": 139.6,
+  "gap": 6.73,
+  "means": [
+   139.6,
+   139.6,
+   139.6
+  ],
+  "outside_pbr_range": [
+   0.0054,
+   0.004,
+   0.0008
+  ]
+ },
+ "lumière principale p95 de la référence": {
+  "target_mean_srgb_derived": 146.8,
+  "gap": 7.04,
+  "means": [
+   146.8,
+   146.8,
+   146.8
+  ],
+  "outside_pbr_range": [
+   0.0048,
+   0.004,
+   0.0006
+  ]
+ },
+ "reference_mean_srgb": 112.3
+}

@@ -1,0 +1,44 @@
+{
+  "aigen3": {
+    "joints": 1,
+    "asymmetry": -2.134151963950294,
+    "peak_above": 0.08034167370050643,
+    "peak_below": 2.2144936376508007
+  },
+  "aigen4": {
+    "joints": 5,
+    "asymmetry": -0.1827647717495362,
+    "peak_above": 0.043593709824990515,
+    "peak_below": 0.22635848157452673
+  },
+  "aigen6": {
+    "joints": 7,
+    "asymmetry": -0.11040028226522126,
+    "peak_above": 0.1462471657275243,
+    "peak_below": 0.2566474479927456
+  },
+  "aigen1": {
+    "joints": 23,
+    "asymmetry": -0.05791872597438637,
+    "peak_above": 0.15871773745173656,
+    "peak_below": 0.21663646342612294
+  },
+  "aigen2": {
+    "joints": 20,
+    "asymmetry": 0.10939223097486801,
+    "peak_above": 0.1964765778654383,
+    "peak_below": 0.08708434689057028
+  },
+  "synthetic height": {
+    "joints": 7,
+    "asymmetry": 0.003876557637608861,
+    "peak_above": 0.1137729272354102,
+    "peak_below": 0.10989636959780134
+  },
+  "same height, lit": {
+    "joints": 7,
+    "asymmetry": -0.30585237908988766,
+    "peak_above": 0.04160996566740291,
+    "peak_below": 0.34746234475729054
+  }
+}
