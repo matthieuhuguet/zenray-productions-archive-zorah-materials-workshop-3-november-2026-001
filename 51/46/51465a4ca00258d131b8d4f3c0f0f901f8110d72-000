@@ -1,0 +1,57 @@
+# 4 November 2026, 00:22 : M4 against M6 for the intention « every generation ends the same » : the three images, where they still differ, their histograms.
+# FR : M4 contre M6 pour l'intention « chaque génération finit pareille » ; plus M4C, M4 dont le contraste aussi se cale sur la référence.
+import itertools
+import sys
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+
+sys.path.insert(0, "/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Scripts")
+from BaseColorExposure import to_lin, to_srgb, luminance, gblur  # noqa: E402
+import BrightnessTournament as T  # noqa: E402
+
+
+def m4c(a, ref, p):
+    # M4, then the spread of log luminance set to the spread of the reference reflectance (a relative contrast, never a fixed value).
+    lin_r, il_r, re_r = T.illum_reflect(ref, p)
+    target = float(re_r.mean() * np.percentile(il_r, p["key_pct"]))
+    lin = to_lin(a); Y = np.maximum(luminance(lin), 1e-5); lY = np.log(Y)
+    s_ref = float(np.log(np.maximum(re_r, 1e-5)).std())
+    lY2 = (lY - lY.mean()) * (s_ref / max(float(lY.std()), 1e-6)) + lY.mean()
+    lin2 = lin * (np.exp(lY2) / Y)[..., None]
+    return T.gain_to(to_srgb(lin2), target)
+
+
+def main(out, ref_p, h_p, paths):
+    p = T.P; ref = T.load(ref_p, p["size"]); height = T.load(h_p, p["size"], grey=True)
+    ins = [T.load(q, p["size"]) for q in paths]
+    ms = T.methods(ref, height, ins, p)
+    rows = [("M4 Retinex, lumière principale", [np.clip(ms["M4 Retinex, lumière principale p90"](a), 0, 1) for a in ins]),
+            ("M6 histogramme de la zone éclairée", [np.clip(ms["M6 histogramme de la zone la mieux éclairée"](a), 0, 1) for a in ins]),
+            ("M4C Retinex + contraste de la référence", [np.clip(m4c(a, ref, p), 0, 1) for a in ins])]
+    c, hw = 300, 300
+    font = ImageFont.truetype("/Users/zenray/Library/Fonts/GT-Ultra-Standard-Regular.otf", 15)
+    sheet = Image.new("RGB", (3 * (c + 6) + c + 6 + hw, len(rows) * (c + 26) + 10), (0, 0, 0))
+    cols = [(255, 120, 90), (110, 220, 120), (110, 160, 255)]
+    for r, (name, outs) in enumerate(rows):
+        Ys = [luminance(to_lin(o)) for o in outs]
+        diff = np.mean([np.abs(gblur(x, 2) - gblur(y, 2)) for x, y in itertools.combinations(Ys, 2)], 0)
+        stds = [float(np.log(np.maximum(Y, 1e-5)).std()) for Y in Ys]
+        y0 = r * (c + 26) + 26
+        ImageDraw.Draw(sheet).text((6, y0 - 21), f"{name}   différence moyenne entre générations {float(diff.mean()) * 255:.1f}   contraste (écart du log) {' / '.join(f'{s:.3f}' for s in stds)}", fill=(255, 255, 255), font=font)
+        for i, o in enumerate(outs):
+            sheet.paste(Image.fromarray((o * 255).astype(np.uint8)).resize((c, c)), (i * (c + 6), y0))
+        heat = np.clip(diff / 0.08, 0, 1)
+        hm = np.stack([heat, heat * 0.55, heat * 0.15], -1)
+        sheet.paste(Image.fromarray((hm * 255).astype(np.uint8)).resize((c, c)), (3 * (c + 6), y0))
+        g = ImageDraw.Draw(sheet); x0 = 4 * (c + 6)
+        g.rectangle([x0, y0, x0 + hw, y0 + c], fill=(20, 20, 20))
+        for Y, col in zip(Ys, cols):
+            h, _ = np.histogram(to_srgb(Y) * 255, bins=64, range=(0, 255)); h = h / h.max()
+            pts = [(x0 + int(k / 63 * hw), y0 + c - int(v * (c - 10))) for k, v in enumerate(h)]
+            g.line(pts, fill=col, width=2)
+    sheet.save(f"{out}/m4_vs_m6_board.png")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:])

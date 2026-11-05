@@ -1,0 +1,83 @@
+# 3 November 2026, 20:55 : where the reproduced height of image 6 differs from its reference, by band and by zone.
+# FR : où la height reproduite de l'image 6 s'écarte de sa référence, par bande de fréquence et par zone.
+import json
+import pathlib
+import sys
+
+import numpy as np
+from PIL import Image
+
+# 3 November 2026, 23:05 : project name as first argument (default ZorahMaterials06), so every panel uses the same check.
+# FR : nom du projet en premier argument (ZorahMaterials06 par défaut), pour que chaque panneau passe le même contrôle.
+NAME = sys.argv[1] if len(sys.argv) > 1 else "ZorahMaterials06"
+W = pathlib.Path("/Users/zenray/.claude/tmp/tmp-zenray-height/projects") / NAME
+REF = W / f"refs/{NAME}_height_2048.png"
+FINAL = W / f"versions/final/{NAME}_{sys.argv[2] if len(sys.argv) > 2 else 'H2'}"  # 3 November 2026, 23:16 : version tag as second argument.
+P = {"bands": [(0.5, 1), (1, 2), (2, 4), (4, 8), (8, 16), (16, 32), (32, 1e9)], "borders": [0, 64, 128, 256]}
+
+
+def load(p):
+    a = np.asarray(Image.open(p)).astype(np.float64)
+    a /= 65535.0 if a.max() > 255 else 255.0
+    return a[..., :3].mean(axis=2) if a.ndim == 3 else a
+
+
+def gblur(a, s):
+    if s >= 1e8:
+        return np.full_like(a, a.mean())
+    fy = np.fft.fftfreq(a.shape[0])[:, None]; fx = np.fft.rfftfreq(a.shape[1])[None, :]
+    return np.fft.irfft2(np.fft.rfft2(a) * np.exp(-2 * np.pi ** 2 * s ** 2 * (fx ** 2 + fy ** 2)), s=a.shape)
+
+
+def corr(a, b):
+    a = a - a.mean(); b = b - b.mean()
+    return float((a * b).sum() / np.sqrt((a * a).sum() * (b * b).sum()))
+
+
+def fft_bands(img, ref):
+    # Exact partition of the variance in rings of wavelength, so the shares add up to 1.
+    # FR : partition exacte de la variance par anneaux de longueur d'onde ; les parts somment à 1.
+    a = np.fft.fft2(img - img.mean()); b = np.fft.fft2(ref - ref.mean())
+    fy = np.fft.fftfreq(img.shape[0])[:, None]; fx = np.fft.fftfreq(img.shape[1])[None, :]
+    lam = 1.0 / np.maximum(np.hypot(fx, fy), 1e-9)
+    tot = (np.abs(b) ** 2).sum(); res = {}
+    for lo, hi in ((1.4, 4), (4, 8), (8, 16), (16, 32), (32, 64), (64, 128), (128, 1e9)):
+        m = (lam >= lo) & (lam < hi)
+        ab = (a[m] * np.conj(b[m])).real.sum(); aa = (np.abs(a[m]) ** 2).sum(); bb = (np.abs(b[m]) ** 2).sum()
+        res[f"{lo}-{hi if hi < 1e8 else 'inf'}px"] = {"corr": float(ab / np.sqrt(aa * bb)), "energy_ratio": float(aa / bb),
+                                                     "ref_energy_share": float(bb / tot), "lost_share_of_error": None}
+    err = np.abs(a - b) ** 2; et = err.sum()
+    for (lo, hi), k in zip(((1.4, 4), (4, 8), (8, 16), (16, 32), (32, 64), (64, 128), (128, 1e9)), list(res)):
+        m = (lam >= lo) & (lam < hi); res[k]["lost_share_of_error"] = float(err[m].sum() / et)
+    return res
+
+
+def main():
+    ref = load(REF)
+    out = {}
+    for name in ("FINAL_height.png", "FINAL_height_untiled.png"):
+        p = FINAL / name
+        if not p.exists():
+            continue
+        img = load(p)
+        r = {"full": corr(img, ref)}
+        for b in P["borders"][1:]:
+            r[f"inner_minus_{b}px"] = corr(img[b:-b, b:-b], ref[b:-b, b:-b])
+        e = (img - ref) ** 2
+        tot = e.sum()
+        r["error_share_border_128px"] = float(1 - e[128:-128, 128:-128].sum() / tot)
+        bands = {}
+        for lo, hi in P["bands"]:
+            fi = gblur(img, lo) - gblur(img, hi); fr = gblur(ref, lo) - gblur(ref, hi)
+            bands[f"{lo}-{hi if hi < 1e8 else 'inf'}px"] = {"corr": corr(fi, fr), "energy_ratio": float(fi.var() / fr.var()), "ref_energy_share": float(fr.var() / ref.var())}
+        r["bands"] = bands
+        r["fft_bands"] = fft_bands(img, ref)
+        q = ref.shape[0] // 4
+        r["row_quarters"] = [corr(img[i * q:(i + 1) * q], ref[i * q:(i + 1) * q]) for i in range(4)]
+        out[name] = r
+    print(json.dumps(out, indent=2))
+    (W / "why_not_999.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()

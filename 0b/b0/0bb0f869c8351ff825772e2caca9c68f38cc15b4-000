@@ -1,0 +1,26 @@
+{
+ "params": {
+  "flat_scale": 0.125,
+  "illum_scale": 0.125,
+  "key_pct": 90,
+  "work_size": 1024,
+  "steps": [
+   "flat",
+   "reinhard",
+   "exposure"
+  ]
+ },
+ "key_luminance_linear": 0.256,
+ "means_before": [
+  98.9,
+  99.2,
+  140.4
+ ],
+ "means_after": [
+  140.0,
+  139.9,
+  139.5
+ ],
+ "gap_before": 29.3,
+ "gap_after": 6.83
+}

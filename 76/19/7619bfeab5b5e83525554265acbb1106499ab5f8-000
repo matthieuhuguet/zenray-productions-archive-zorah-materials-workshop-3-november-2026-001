@@ -1,0 +1,270 @@
+# 3 November 2026, 18:49 : measures why some AI height maps look lit and others do not.
+# FR : mesure pourquoi certaines heights générées par IA paraissent éclairées et d'autres non.
+import json
+import pathlib
+import sys
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+
+# Labels in GT Ultra, which draws the French accents. FR : libellés en GT Ultra, qui dessine les accents.
+FONT = ImageFont.truetype("/Users/zenray/Library/Fonts/GT-Ultra-Standard-Regular.otf", 13)
+
+
+def put_text(dr, xy, text, fill):
+    dr.text(xy, text, fill=fill, font=FONT)
+
+ROOT = pathlib.Path("/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026")
+AIGEN = ROOT / "Sources/artstation-eRZ01X/textures/ai-gen"
+SRC = ROOT / "Sources/artstation-eRZ01X/textures"
+OUT = ROOT / "Analysis/ai-height-lighting-3-November-2026"
+
+# One place for every measurement setting (HDA rule).
+# FR : une seule place pour chaque réglage de mesure.
+P = {
+    "work_px": 1024,     # every image is measured at this size
+    "hp_sigma": 6.0,     # high-pass scale of the local relief, px
+    "lag": 3,            # pixel lag of the shading-pair statistic
+    "lf_sigma": 64.0,    # low-frequency scale, where a light cone or a vignette lives, px
+    "map_sigma": 8.0,    # smoothing of the local shading map, px
+    "extreme_k": 2.0,    # highlight and shadow masks: beyond k standard deviations of the high-pass
+    "pair_radius": 4,    # a highlight is paired when a shadow lies within this many px
+    "match_px": 256,     # size used to find the source panel of each AI image
+    "cell": 256,         # size of one cell of the board
+}
+
+
+def load(path):
+    a = np.asarray(Image.open(path))
+    a = a.astype(np.float64) / (65535.0 if a.dtype == np.uint16 else 255.0)
+    return a[..., :3].mean(axis=2) if a.ndim == 3 else a
+
+
+def resize(a, n):
+    h, w = a.shape
+    if h == w and h % n == 0:
+        f = h // n
+        return a.reshape(n, f, n, f).mean(axis=(1, 3))
+    return np.asarray(Image.fromarray(a.astype(np.float32)).resize((n, n), Image.BOX), dtype=np.float64)
+
+
+def gblur(a, s):
+    h, w = a.shape
+    fy = np.fft.fftfreq(h)[:, None]
+    fx = np.fft.rfftfreq(w)[None, :]
+    return np.fft.irfft2(np.fft.rfft2(a) * np.exp(-2 * np.pi ** 2 * s ** 2 * (fx ** 2 + fy ** 2)), s=a.shape)
+
+
+def at(a, dx, dy):
+    # Value at x + (dx, dy), wrapping like a seamless texture.
+    return np.roll(np.roll(a, -dy, axis=0), -dx, axis=1)
+
+
+def odd_pair(dn, ux, uy, lag):
+    # Third-order odd statistic: zero for any relief with symmetric features, large when every
+    # feature is bright on one side and dark on the other, which is what a light does.
+    # FR : nul pour un relief symétrique, fort quand chaque détail a un côté clair et un côté sombre.
+    dx, dy = int(round(ux * lag)), int(round(uy * lag))
+    return float((dn * (at(dn, dx, dy) ** 2 - at(dn, -dx, -dy) ** 2)).mean() / (np.abs(dn) ** 3).mean())
+
+
+def pairing(dn, k, r):
+    # A lit relief shows every edge as a thin highlight touching a shadow; a height shows a cavity as a
+    # dark spot alone. FR : un relief éclairé montre chaque arête en liseré clair collé à une ombre.
+    hi, sh = dn > k, dn < -k
+    offs = [(dx, dy) for dx in range(-r, r + 1) for dy in range(-r, r + 1) if 0 < dx * dx + dy * dy <= r * r]
+    near = np.zeros_like(sh)
+    vx = vy = tot = 0.0
+    for dx, dy in offs:
+        s2 = at(sh, dx, dy)
+        near |= s2
+        c = float((hi & s2).sum()); d = np.hypot(dx, dy)
+        vx += c * dx / d; vy += c * dy / d; tot += c
+    nh, ns = int(hi.sum()), int(sh.sum())
+    coh = float(np.hypot(vx, vy) / tot) if tot else 0.0
+    # Offset points from highlight to shadow, so the light comes from the opposite side.
+    ang = float(np.degrees(np.arctan2(-(-vy), -vx))) if tot else 0.0
+    return {"bright_share": nh / max(nh + ns, 1), "paired": float((hi & near).sum() / max(nh, 1)),
+            "coherence": coh, "light_from_deg": ang, "highlights": nh / dn.size, "shadows": ns / dn.size}, hi, hi & near, sh
+
+
+def spectrum_slope(a, kmin=4, kmax=256):
+    f = np.abs(np.fft.fft2(a - a.mean())) ** 2
+    n = a.shape[0]
+    ky, kx = np.meshgrid(np.fft.fftfreq(n) * n, np.fft.fftfreq(n) * n, indexing="ij")
+    k = np.hypot(kx, ky).astype(int)
+    ks = np.arange(kmin, kmax)
+    pw = np.array([f[k == i].mean() for i in ks])
+    return float(np.polyfit(np.log(ks), np.log(pw), 1)[0])
+
+
+def native_cutoff(path):
+    # Share of high-frequency power above a third of Nyquist, on a native 1024 px crop.
+    # An image upscaled from a smaller one has almost nothing there.
+    a = load(path)[:1024, :1024]
+    f = np.abs(np.fft.fft2(a - a.mean())) ** 2
+    ky, kx = np.meshgrid(np.fft.fftfreq(1024), np.fft.fftfreq(1024), indexing="ij")
+    r = np.hypot(kx, ky) / 0.5
+    return float(f[(r > 0.66) & (r < 0.95)].mean() / f[(r > 0.15) & (r < 0.3)].mean())
+
+
+def measure(img):
+    n = img.shape[0]
+    hp = img - gblur(img, P["hp_sigma"])
+    dn = hp / hp.std()
+    pm, hi, paired, sh = pairing(dn, P["extreme_k"], P["pair_radius"])
+    lf = gblur(img, P["lf_sigma"])
+    yy, xx = np.mgrid[0:n, 0:n] / n
+    coef = np.linalg.lstsq(np.c_[np.ones(n * n), xx.ravel(), yy.ravel()], img.ravel(), rcond=None)[0]
+    k = P["extreme_k"]
+    return {
+        "mean": float(img.mean()), "std": float(img.std()),
+        "p1": float(np.percentile(img, 1)), "p50": float(np.percentile(img, 50)), "p99": float(np.percentile(img, 99)),
+        "clip_black": float((img <= 1 / 255).mean()), "clip_white": float((img >= 254 / 255).mean()),
+        "lf_ratio": float(lf.std() / img.std()),
+        "plane_gradient": float(np.hypot(coef[1], coef[2])),
+        **pm,
+        "skew_highpass": float((dn ** 3).mean()),
+        "spectrum_slope": spectrum_slope(img),
+        "seam_ratio_lr": float(np.abs(img[:, 0] - img[:, -1]).mean() / np.abs(np.diff(img, axis=1)).mean()),
+        "seam_ratio_tb": float(np.abs(img[0] - img[-1]).mean() / np.abs(np.diff(img, axis=0)).mean()),
+    }, dn, lf, (hi, paired, sh)
+
+
+def shade(h, light=(-1.0, -1.0, 1.2), strength=12.0):
+    # Lambert render of a height, used to calibrate the shading statistic.
+    gx = (at(h, 1, 0) - at(h, -1, 0)) / 2 * strength
+    gy = (at(h, 0, 1) - at(h, 0, -1)) / 2 * strength
+    nrm = np.sqrt(gx ** 2 + gy ** 2 + 1)
+    l = np.array(light) / np.linalg.norm(light)
+    return np.clip((-gx * l[0] - gy * l[1] + l[2]) / nrm, 0, 1)
+
+
+def synthetic(n, seed=3):
+    # Stone blocks of constant height, recessed joints, a few pits: a true height of the Zorah kind.
+    rng = np.random.default_rng(seed)
+    yy, xx = np.mgrid[0:n, 0:n]
+    bh, bw, j = n // 8, n // 4, 6
+    row = yy // bh
+    off = (row % 2) * (bw // 2)
+    joint = ((yy % bh) < j) | (((xx + off) % bw) < j)
+    h = np.where(joint, 0.2, 0.62) + 0.03 * gblur(rng.normal(size=(n, n)), 3)
+    for _ in range(140):
+        cx, cy, r = rng.uniform(0, n), rng.uniform(0, n), rng.uniform(2, 5)
+        dx = (xx - cx + n / 2) % n - n / 2
+        dy = (yy - cy + n / 2) % n - n / 2
+        h -= 0.25 * np.exp(-(dx ** 2 + dy ** 2) / (2 * r ** 2))
+    return np.clip(gblur(h, 1.2), 0, 1)
+
+
+def synthetic_old(n, seed=3):
+    rng = np.random.default_rng(seed)
+    h = np.zeros((n, n))
+    yy, xx = np.mgrid[0:n, 0:n]
+    for _ in range(260):
+        cx, cy, r, s = rng.uniform(0, n), rng.uniform(0, n), rng.uniform(3, 18), rng.choice([-1, 1])
+        dx = (xx - cx + n / 2) % n - n / 2
+        dy = (yy - cy + n / 2) % n - n / 2
+        h += s * np.exp(-(dx ** 2 + dy ** 2) / (2 * r ** 2))
+    h += 0.4 * gblur(rng.normal(size=(n, n)), 2)
+    return (h - h.min()) / (h.max() - h.min())
+
+
+def panel(path):
+    a = load(path)
+    cols = a[300:1700].mean(axis=0) > 0.17
+    runs, start = [], None
+    for i, v in enumerate(np.r_[cols, False]):
+        if v and start is None: start = i
+        if not v and start is not None: runs.append((start, i)); start = None
+    x0, x1 = max(runs, key=lambda r: (r[1] - r[0] > 1000, r[0]))
+    rows = a[:, x0:x1].mean(axis=1) > 0.17
+    ys = np.where(rows)[0]
+    y0, y1 = ys[0], ys[-1]
+    m = int(0.03 * (x1 - x0))
+    return a[y0 + m:y1 - m, x0 + m:x1 - m]
+
+
+def ncc_best(a, b):
+    a = (a - a.mean()) / a.std(); b = (b - b.mean()) / b.std()
+    c = np.fft.irfft2(np.fft.rfft2(a) * np.conj(np.fft.rfft2(b)), s=a.shape) / a.size
+    return float(c.max())
+
+
+def tone(a, lo, hi):
+    return Image.fromarray(np.clip((a - lo) / (hi - lo) * 255, 0, 255).astype(np.uint8))
+
+
+def histogram(img, size):
+    h, _ = np.histogram(img, 128, (0, 1))
+    im = Image.new("L", (size, size), 24)
+    dr = ImageDraw.Draw(im)
+    top = h.max()
+    for i, v in enumerate(h):
+        x = int(i * size / 128)
+        dr.rectangle([x, size - 1 - int(v / top * (size - 20)), x + int(size / 128), size - 1], fill=200)
+    dr.line([size // 2, 0, size // 2, size], fill=90)
+    return im
+
+
+def main():
+    OUT.mkdir(parents=True, exist_ok=True)
+    n = P["work_px"]
+    names = sorted(p.stem for p in AIGEN.glob("aigen*.png"))
+    rows, report = [], {"settings": P, "images": {}, "calibration": {}}
+    panels = [resize(panel(p), n) for p in sorted(SRC.glob("zorah-*.jpg"))]
+    cone = gblur(np.mean(panels, axis=0), P["lf_sigma"])
+    tone(cone - cone.mean(), -0.12, 0.12).save(OUT / "studio_light_cone.png")
+    for name in names:
+        path = AIGEN / f"{name}.png"
+        img = resize(load(path), n)
+        m, dn, lf, masks = measure(img)
+        m["cone_corr"] = float(np.corrcoef(lf.ravel(), cone.ravel())[0, 1])
+        m["native_hf_share"] = native_cutoff(path)
+        report["images"][name] = m
+        rows.append((name, img, dn, lf, m, masks))
+    syn = synthetic(n)
+    for label, img in (("synthetic height", syn), ("same height, lit", shade(syn)), ("aigen1, lit by us", shade(rows[0][1], strength=3.0) if rows else None)):
+        if img is None: continue
+        m, dn, lf, masks = measure(img)
+        report["calibration"][label] = m
+        rows.append((label, img, dn, lf, m, masks))
+    # Board: image, low frequency light, shading pairs, extreme masks, histogram.
+    c = P["cell"]; lab = 150; head = 26
+    titles = ["image", "lumière basse fréquence", "extrêmes : blanc clair, noir sombre", "rouge : clair collé à une ombre", "histogramme"]
+    board = Image.new("RGB", (lab + c * 5, head + c * len(rows)), (24, 24, 24))
+    dr = ImageDraw.Draw(board)
+    for j, t in enumerate(titles): put_text(dr, (lab + j * c + 6, 7), t, fill=(220, 220, 220))
+    for i, (name, img, dn, lf, m, masks) in enumerate(rows):
+        y = head + i * c
+        hi, paired, sh = masks
+        ext = np.full(img.shape, 128.0); ext[hi] = 255; ext[sh] = 0
+        pr = np.dstack([np.full(img.shape, 70.0)] * 3); pr[sh] = (0, 0, 0); pr[hi] = (255, 255, 255); pr[paired] = (235, 40, 40)
+        cells = [tone(img, 0, 1), tone(lf - lf.mean(), -0.12, 0.12), tone(ext, 0, 255),
+                 Image.fromarray(pr.astype(np.uint8)), histogram(img, c)]
+        for j, cell in enumerate(cells): board.paste(cell.convert("RGB").resize((c, c), Image.NEAREST if j in (2, 3) else Image.LANCZOS), (lab + j * c, y))
+        put_text(dr, (6, y + 6), name, fill=(235, 235, 235))
+        put_text(dr, (6, y + 26), f"part claire {m['bright_share']:.2f}", fill=(200, 200, 200))
+        put_text(dr, (6, y + 42), f"clair+ombre {m['paired']:.2f}", fill=(200, 200, 200))
+        put_text(dr, (6, y + 58), f"cohérence {m['coherence']:.2f}", fill=(200, 200, 200))
+        put_text(dr, (6, y + 74), f"asym. {m['skew_highpass']:+.2f}", fill=(200, 200, 200))
+        if "cone_corr" in m:
+            put_text(dr, (6, y + 90), f"cône studio {m['cone_corr']:+.2f}", fill=(200, 200, 200))
+    board.save(OUT / "board.png")
+    (OUT / "metrics.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    keys = ["bright_share", "paired", "coherence", "light_from_deg", "skew_highpass", "highlights", "shadows",
+            "lf_ratio", "cone_corr", "plane_gradient", "mean", "std", "p1", "p99", "spectrum_slope",
+            "seam_ratio_lr", "seam_ratio_tb", "native_hf_share"]
+    allrows = {**report["images"], **report["calibration"]}
+    print("metric".ljust(22) + "".join(k[:16].rjust(17) for k in allrows))
+    for k in keys:
+        vals = []
+        for v in allrows.values():
+            x = v.get(k, "")
+            vals.append((f"{x:.3f}" if isinstance(x, float) else str(x)).rjust(17))
+        print(k.ljust(22) + "".join(vals))
+    print("board", OUT / "board.png")
+
+
+if __name__ == "__main__":
+    main()

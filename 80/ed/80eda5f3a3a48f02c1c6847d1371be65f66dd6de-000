@@ -1,0 +1,113 @@
+# Prompt de correction d'ombrage, Zorah Materials (3 November 2026, 21:28 +0100)
+
+## Version qui a marché (3 November 2026, 21:45 +0100), en deuxième message
+
+Message 1 : la height Python de l'étape 2 (tous les détails à leur place). Message 2, dans la même conversation, avec cette height jointe :
+
+```text
+With AI gen create image Corrige les défauts d'ombrage de cette height map, sans rien changer d'autre. then in python redo with 99.9% precision in the composition.
+```
+
+À tester plus tard, non prouvé : tout en une seule étape depuis la référence en couleur.
+
+## Version du 21:28 +0100, remplacée par la version qui a marché
+
+Validé par Matthieu (« le prompt est parfait »). Joindre une seule image : la height Python de l'étape 2. Même conversation ChatGPT que la height (chat séquentiel).
+
+```text
+Corrige les défauts d'ombrage de cette height map, sans rien changer d'autre. then redo with 99.9% precision in the composition.
+```
+
+## Chaîne de valeur (3 November 2026, 21:28 +0100)
+
+1. Référence : panneau éclairé découpé à plat (`Scripts/CropPanels.py`), avec son défaut d'ombrage.
+2. Height Python : prompt final de `height-prompt-zorah.md` (paragraphe Python seul si la référence est droite).
+3. Correction d'ombrage : la version qui a marché (21:45), en deuxième message, sur la height de l'étape 2.
+4. Comparaison des heights 2 et 3 en tuile 2x2 : ombrage parti, détails à leur place ; `CheckAiHeight.py`, et `Dearc.py measure` pour des planches. Matthieu choisit.
+5. ZenRay Height : `Reproduce.py` sur la height retenue, grille 2x2 envoyée.
+6. Base color flat : `basecolor-prompt-zorah.md`, avec le panneau et la height finale.
+7. Base color et 5 cartes : `HeightToBaseColor.py` dans Houdini.
+
+Source de vérité : `/Users/zenray/.claude/skills/zenray-houdini/SKILL.md`, section du 3 November 2026, 21:28 +0100.
+
+## Version en une seule étape (3 November 2026, 22:08 +0100), consignée, pas encore testée
+
+Un seul message avec le panneau de référence découpé. Concept de l'étape 2 : séparation de fréquences, les détails de l'étape 1 et l'ombrage de l'image générée (mesure : `Analysis/frequency-merge-3-November-2026/`).
+
+```text
+Respecte absolument l'ordre de ce prompt, une étape après l'autre.
+
+Étape 1. Fais la height map de cette image : même cadrage, chaque détail exactement à la même place, pixel pour pixel. Niveaux de gris : blanc = haut, noir = creux. Sans lumière, sans ombre, sans couleur. then redo with 99.9% precision in the composition.
+Pour cette étape, n'utilise pas la génération d'image. En Python, calcule la height map de cette image : niveaux de gris, puis retire l'éclairage de grande échelle par un filtre passe-haut, même taille, PNG 16 bits. then redo with 99.9% precision in the composition.
+
+Étape 2, seulement une fois la height map de l'étape 1 obtenue. With AI gen create image : corrige les défauts d'ombrage de cette height map, sans rien changer d'autre.
+Puis en Python, par séparation de fréquences (filtre passe-haut, sigma), sans relire l'image de départ : les détails fins viennent de la height de l'étape 1, l'ombrage corrigé vient de l'image générée. Même taille, PNG 16 bits. then redo with 99.9% precision in the composition.
+```
+
+## Version en une seule étape (3 November 2026, 21:58 +0100), remplacée à 22:08 (détails pris de l'IA, sigma imposé)
+
+```text
+Respecte absolument l'ordre de ce prompt, une étape après l'autre.
+
+Étape 1. Fais la height map de cette image : même cadrage, chaque détail exactement à la même place, pixel pour pixel. Niveaux de gris : blanc = haut, noir = creux. Sans lumière, sans ombre, sans couleur. then redo with 99.9% precision in the composition.
+Pour cette étape, n'utilise pas la génération d'image. En Python, calcule la height map de cette image : niveaux de gris, puis retire l'éclairage de grande échelle par un filtre passe-haut, même taille, PNG 16 bits. then redo with 99.9% precision in the composition.
+
+Étape 2, seulement une fois la height map de l'étape 1 obtenue. With AI gen create image : corrige les défauts d'ombrage de cette height map, sans rien changer d'autre.
+Puis en Python, sur cette height générée seulement, sans jamais relire l'image de départ (elle remettrait les défauts d'ombrage) : filtre passe-haut gaussien de sigma égal à la largeur de l'image divisée par 32, recentré sur le gris moyen, pour gommer les derniers défauts d'ombrage. Même taille, PNG 16 bits. then redo with 99.9% precision in the composition.
+```
+
+## Version en une seule étape (3 November 2026, 22:20 +0100), À TESTER : niveaux de gris seulement sur l'image générée
+
+Test de 22:08 raté (planche `Analysis/one-step-test-3-November-2026/chatgpt-one-step-board.webp`) : la fusion Python ressemble à l'image 1 et remet l'ombrage. Idée de Matthieu : ne reprendre de l'étape 1 que ses niveaux de gris.
+
+```text
+Respecte absolument l'ordre de ce prompt, une étape après l'autre.
+
+Étape 1. Fais la height map de cette image : même cadrage, chaque détail exactement à la même place, pixel pour pixel. Niveaux de gris : blanc = haut, noir = creux. Sans lumière, sans ombre, sans couleur. then redo with 99.9% precision in the composition.
+Pour cette étape, n'utilise pas la génération d'image. En Python, calcule la height map de cette image : niveaux de gris, puis retire l'éclairage de grande échelle par un filtre passe-haut, même taille, PNG 16 bits. then redo with 99.9% precision in the composition.
+
+Étape 2, seulement une fois la height map de l'étape 1 obtenue. With AI gen create image : corrige les défauts d'ombrage de cette height map, sans rien changer d'autre.
+Puis en Python, sur l'image générée seulement : ajuste ses niveaux de gris (gris moyen, contraste, plage) sur ceux de la height de l'étape 1, sans reprendre aucun de ses pixels, ni ses détails ni son ombrage. Même taille que l'étape 1, PNG 16 bits. then redo with 99.9% precision in the composition.
+```
+
+## Version en trois étapes dans un seul message (3 November 2026, 22:24 +0100), À TESTER
+
+Demande de Matthieu : sortir le Python de l'étape 2 en étape 3, avec la phrase « le but de Python est de ne pas reproduire le problème d'ombrage de l'étape 1 », précisée pour ne pas être mal lue.
+
+```text
+Respecte absolument l'ordre de ce prompt, une étape après l'autre.
+
+Étape 1. Fais la height map de cette image : même cadrage, chaque détail exactement à la même place, pixel pour pixel. Niveaux de gris : blanc = haut, noir = creux. Sans lumière, sans ombre, sans couleur. then redo with 99.9% precision in the composition.
+Pour cette étape, n'utilise pas la génération d'image. En Python, calcule la height map de cette image : niveaux de gris, puis retire l'éclairage de grande échelle par un filtre passe-haut, même taille, PNG 16 bits. then redo with 99.9% precision in the composition.
+
+Étape 2, seulement une fois la height map de l'étape 1 obtenue. With AI gen create image : corrige les défauts d'ombrage de cette height map, sans rien changer d'autre.
+
+Étape 3, seulement une fois l'image de l'étape 2 obtenue. En Python, pars de l'image de l'étape 2 et ajuste seulement ses niveaux de gris (gris moyen, contraste, plage) sur ceux de la height de l'étape 1. Le but de Python est de ne pas reproduire le problème d'ombrage de l'étape 1 : de l'étape 1, ne reprends que ses niveaux de gris, jamais ses pixels, ses détails ni son ombrage. Les reliefs et les creux de l'étape 2 restent tels quels. Même taille que l'étape 1, PNG 16 bits. then redo with 99.9% precision in the composition.
+```
+
+## Version en quatre étapes dans un seul message (3 November 2026, 22:34 +0100), À TESTER : rolling ball par le haut en étape 4
+
+**VALIDÉE (3 November 2026, 22:47 +0100)** par Matthieu : « Insane le prompt, c'est magique ». Source de vérité : `/Users/zenray/.claude/skills/zenray-houdini/templates/zenray-height-from-map/prompt_height_chain.md`.
+
+Choix de Matthieu après la planche `Analysis/final-step-options-3-November-2026/final_step_board.png` : seule la rolling ball par le haut retire l'ombrage restant ; par le bas, elle rend les rainures blanches.
+
+```text
+Respecte absolument l'ordre de ce prompt, une étape après l'autre.
+
+Étape 1. Fais la height map de cette image : même cadrage, chaque détail exactement à la même place, pixel pour pixel. Niveaux de gris : blanc = haut, noir = creux. Sans lumière, sans ombre, sans couleur. then redo with 99.9% precision in the composition.
+Pour cette étape, n'utilise pas la génération d'image. En Python, calcule la height map de cette image : niveaux de gris, puis retire l'éclairage de grande échelle par un filtre passe-haut, même taille, PNG 16 bits. then redo with 99.9% precision in the composition.
+
+Étape 2, seulement une fois la height map de l'étape 1 obtenue. With AI gen create image : corrige les défauts d'ombrage de cette height map, sans rien changer d'autre.
+
+Étape 3, seulement une fois l'image de l'étape 2 obtenue. En Python, pars de l'image de l'étape 2 et ajuste seulement ses niveaux de gris (gris moyen, contraste, plage) sur ceux de la height de l'étape 1. Le but de Python est de ne pas reproduire le problème d'ombrage de l'étape 1 : de l'étape 1, ne reprends que ses niveaux de gris, jamais ses pixels, ses détails ni son ombrage. Les reliefs et les creux de l'étape 2 restent tels quels. Même taille que l'étape 1, PNG 16 bits. then redo with 99.9% precision in the composition.
+
+Étape 4, seulement une fois l'image de l'étape 3 obtenue. En Python, sur cette image seulement : retire le fond d'ombrage par soustraction de fond façon rolling ball, la boule roulant par le haut, sur la surface, pour que les rainures et les creux restent sombres et ne soient jamais pris pour le fond. Même taille, PNG 16 bits. then redo with 99.9% precision in the composition.
+```
+
+## Étape 4 longue, À TESTER (4 November 2026, 00:57 +0100) : le détail complet de l'uniformiseur `RollingBallTop.py`, sans valeur absolue
+
+Recherche faite à la demande de Matthieu dans `FEEDBACK.md`, dans la conversation et dans l'historique git du gabarit : l'étape 4 de la height n'a jamais existé que sous une forme (413 caractères, 3 November 2026, 22:33 puis 22:34, consignée à 22:47), jamais raccourcie. Ce qui a été raccourci sous la règle « le concept, pas la méthode » : la fusion par fréquences de la height (sigma = largeur / 128, 22:08) et l'étape 4 de la base color (4 November 2026, 00:31). Cette version longue reprend, sur le modèle de l'étape 4 détaillée de la base color, toute la méthode locale validée (rolling ball par le haut et trois filtres d'accord).
+
+```text
+Étape 4, seulement une fois l'image de l'étape 3 obtenue. En Python, sur cette image seulement : d'abord retire le fond d'ombrage par soustraction de fond façon rolling ball, la boule roulant par le haut, sur la surface, pour que les rainures et les creux restent sombres et ne soient jamais pris pour le fond ; puis calme le grain le plus fin par un flou très léger, car c'est là que le dessin change d'une génération à l'autre ; puis renforce légèrement les détails moyens (reliefs, rainures, éclats), qui portent la forme de la matière ; puis atténue de moitié ce qui reste à très grande échelle, sans toucher aux détails ; enfin, remets ses niveaux de gris (gris moyen, contraste, plage) sur ceux de la height de l'étape 1, sans jamais reprendre ses pixels. Même taille, PNG 16 bits. then redo with 99.9% precision in the composition.
+```

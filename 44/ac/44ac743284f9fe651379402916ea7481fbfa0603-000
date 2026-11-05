@@ -1,0 +1,42 @@
+# 3 November 2026, 23:06 : extra ZenRay Height round (plan L6, pixel passes and second equaliser) resumed from H2, then tiling and measures.
+# FR : tour ZenRay Height supplémentaire (plan L6) repris de H2, puis raccord et mesures en pleine résolution.
+# Usage : python -I RunL6.py <Name>   (live Houdini bridge required)
+import json
+import os
+import sys
+
+NAME = sys.argv[1]
+CODE = "/Users/zenray/.claude/skills/zenray-houdini/scripts/height"
+WORK = f"/Users/zenray/.claude/tmp/tmp-zenray-height/projects/{NAME}"
+os.environ["ZRH_WORK"] = WORK
+sys.path.insert(0, CODE)
+import numpy as np  # noqa: E402
+import Execute as EX  # noqa: E402
+import RunPasses as RP  # noqa: E402
+import MakeTileable as MT  # noqa: E402
+import Measure as M  # noqa: E402
+import SeamCheck as S  # noqa: E402
+from RefLib import load_gray  # noqa: E402
+
+
+# 3 November 2026, 23:09 : the run uses a process pool ; without this guard every worker re-ran the whole script (BrokenProcessPool).
+# FR : le calcul utilise un pool de processus ; sans cette garde chaque processus relançait tout le script.
+def main():
+    net = f"/obj/ZRH_{NAME}"
+    ref = os.path.join(WORK, "refs", f"{NAME}_height_2048.png")
+    final_dir = os.path.join(WORK, "versions", "final")
+    h2, h3 = os.path.join(final_dir, f"{NAME}_H2"), os.path.join(final_dir, f"{NAME}_H3")
+    EX.run(f"{NAME}_H3", net, ref, None, plan=RP.plan_for("L6"), min_gain=0.0005, resume=h2)
+    tile = MT.make_tileable(h3, net, ref, None, params={})
+    r, f = load_gray(ref), load_gray(os.path.join(h3, "FINAL_height.png"))
+    m = M.measure(f, r, np.ones_like(r, bool))
+    seam = S.seam(f, json.load(open(os.path.join(h3, "log.json"))).get("cells"))
+    rep = {"name": NAME, "height": os.path.join(h3, "FINAL_height.png"), "pearson_full": round(m["pearson"], 4), "ssim_full": round(m["ssim"], 4),
+           "mae": round(m["mae"], 4), "seam_xy": [round(seam["ratio_x"], 2), round(seam["ratio_y"], 2)], "seam_layer": bool(tile.get("applied")),
+           "seamless_verdict": (tile.get("verdict") or {}).get("ok"), "grid": tile.get("grid")}
+    json.dump(rep, open(os.path.join(WORK, "report_L6.json"), "w"), indent=1)
+    print(json.dumps(rep, indent=1))
+
+
+if __name__ == "__main__":
+    main()

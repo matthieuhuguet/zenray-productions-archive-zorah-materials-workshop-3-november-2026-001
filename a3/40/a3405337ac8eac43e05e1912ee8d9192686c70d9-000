@@ -1,0 +1,132 @@
+# 4 November 2026, 02:41 : de-lighting tournament, second round. FR : tournoi de délighting, deuxième tour.
+# Round 1 (DelightTournament.py) : on the real panel the diagonal cast shadow band stays in every method that keeps the block tints,
+# and the methods that remove it (small scales, bilateral, guided) wash the block tints out. The bench light was too soft (blur 24 px).
+# Round 2 : (1) an analytic bench light with sharp cast shadow bands (penumbra 2 % of the width), a spot and a vignette, independent of
+# any method ; (2) two new methods built on the fact that light is continuous across the joints while the albedo jumps there :
+#   M17 joint aware Poisson : the illumination is rebuilt from the gradients of the in-block smoothed luminance only, the gradients that
+#       cross a joint (found on the height) are left out, so block tints stay and the band edges, inside the blocks, go ;
+#   M18 = M17 + relief shading removed by the light direction regressed on the height normals.
+# Losers of round 1 (M09 naive blocks, M10 Horn) are not replayed ; the 14 others and M17, M18 play the bracket.
+# Usage : python -I DelightTournament2.py <panel.png> <height16.png> <albedo.png> <out_dir> [--selftest]
+import json
+import os
+import sys
+import time
+
+import numpy as np
+from PIL import Image
+from scipy import ndimage as ndi
+from scipy import sparse
+from scipy.sparse.linalg import cg
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import DelightTournament as T  # noqa: E402
+
+P2 = {"solve_size": 256, "joint_k": 2.0, "lambda": 1e-3,
+      "spot": (0.62, -0.05, 0.55), "band": (0.30, 0.0, 122.0, 0.13, 0.35), "penumbra": 0.02, "ambient": 0.18}
+
+
+def joints_from_height(h):
+    d = h - T.blur(h, 16); m = d < -P2["joint_k"] * d.std()
+    return ndi.binary_dilation(m, iterations=1)
+
+
+def joint_poisson(z, ctx, s):
+    n = P2["solve_size"]; k = s * n / T.N
+    zs = T.small(z, n); inside = ~(T.small(ctx["joints"].astype(float), n) > 0.2)
+    zb = T.blur(zs * inside, k) / np.maximum(T.blur(inside.astype(float), k), 1e-6)
+    gx, gy = zb[:, 1:] - zb[:, :-1], zb[1:, :] - zb[:-1, :]
+    wx = (inside[:, 1:] & inside[:, :-1]).astype(float); wy = (inside[1:, :] & inside[:-1, :]).astype(float)
+    idx = np.arange(n * n).reshape(n, n)
+    def D(axis):
+        if axis == 1:
+            a, b = idx[:, :-1].ravel(), idx[:, 1:].ravel()
+        else:
+            a, b = idx[:-1, :].ravel(), idx[1:, :].ravel()
+        m = len(a); return sparse.csr_matrix((np.r_[-np.ones(m), np.ones(m)], (np.r_[np.arange(m), np.arange(m)], np.r_[a, b])), shape=(m, n * n))
+    Dx, Dy = D(1), D(0)
+    Wx, Wy = sparse.diags(wx.ravel() + P2["lambda"]), sparse.diags(wy.ravel() + P2["lambda"])
+    A = Dx.T @ Wx @ Dx + Dy.T @ Wy @ Dy + sparse.identity(n * n) * 1e-6
+    b = Dx.T @ (wx.ravel() * gx.ravel()) + Dy.T @ (wy.ravel() * gy.ravel())
+    x, _ = cg(A, b, x0=zb.ravel(), maxiter=800, rtol=1e-6)
+    return T.big(x.reshape(n, n))
+
+
+def relief(z, ctx):
+    nrm = ctx["n"]; hp = z - T.blur(z, 8)
+    A = np.stack([nrm[..., 0] - T.blur(nrm[..., 0], 8), nrm[..., 1] - T.blur(nrm[..., 1], 8)], -1).reshape(-1, 2)
+    k, *_ = np.linalg.lstsq(A, hp.ravel(), rcond=None)
+    return k[0] * nrm[..., 0] + k[1] * nrm[..., 1]
+
+
+def m17(z, ctx, s):
+    return joint_poisson(z, ctx, s)
+
+
+def m18(z, ctx, s):
+    r = relief(z, ctx); return r + joint_poisson(z - r, ctx, s)
+
+
+def analytic_light(n):
+    Y, X = np.mgrid[0:n, 0:n] / float(n)
+    cx, cy, ss = P2["spot"]; spot = np.exp(-((X - cx) ** 2 + (Y - cy) ** 2) / (2 * ss ** 2))
+    bx, by, ang, width, keep = P2["band"]; t = np.deg2rad(ang)
+    d = (X - bx) * np.cos(t) + (Y - by) * np.sin(t)
+    pen = P2["penumbra"]; sm = lambda u: 1 / (1 + np.exp(-u / (pen / 4)))
+    inside = sm(d) * sm(width - d)
+    band = 1 - (1 - keep) * inside
+    vign = 1 - 0.35 * ((X - 0.5) ** 2 + (Y - 0.5) ** 2) * 2
+    return np.log(P2["ambient"] + spot * band * vign)
+
+
+def main(argv):
+    panel_p, h_p, alb_p, out = argv[:4]
+    panel, h, albedo = T.load_rgb(panel_p), T.load_h(h_p), T.load_rgb(alb_p)
+    nrm = T.normals(h); joints = joints_from_height(h)
+    k = T.build_bench(panel, h, albedo)[2]
+    S = analytic_light(T.N) + k[0] * nrm[..., 0] + k[1] * nrm[..., 1]
+    lit = albedo * np.exp(S - S.mean())[..., None]
+    ctx = {"n": nrm, "lab": T.blocks_from_height(h), "chroma": T.chroma(lit), "joints": joints}
+    chk = (T.scores(albedo, albedo)["score"], T.scores(lit, albedo)["score"])
+    print("verifier truth", chk[0], "lit input", chk[1], "joints share", round(float(joints.mean()), 3))
+    if "--selftest" in argv:
+        o = T.apply(lit, ctx, m17, 8); s17 = T.scores(o, albedo)["score"]
+        print("selftest", chk[0] > 0.99 and chk[1] < 0.8, "m17 beats the lit input", s17 > chk[1], round(s17, 4)); return 0
+    methods = [m for m in T.METHODS if m[0] not in ("M09", "M10")] + [
+        ("M17", "Poisson des joints (lumière continue entre blocs)", m17, [16, 12, 8, 4]),
+        ("M18", "Poisson des joints + relief retiré", m18, [16, 12, 8, 4])]
+    res = {}
+    for code, name, fn, phases in methods:
+        t0 = time.time(); ph = []
+        for s in phases:
+            try:
+                sc = T.scores(T.apply(lit, ctx, fn, s), albedo)
+            except Exception as e:
+                sc = {"score": -9, "error": str(e)[:120]}
+            ph.append({"param": s, **sc})
+        best = max(ph, key=lambda q: q["score"]); res[code] = {"name": name, "phases": ph, "best": best, "seconds": round(time.time() - t0, 1)}
+        print(code, name, "best", best["param"], best["score"], "fine", best.get("fine"), "broad", best.get("broad"), f"{res[code]['seconds']} s", flush=True)
+    alive, rnd, bracket = [m[0] for m in methods], 1, []
+    while len(alive) > 1:
+        nxt = []
+        for a, b in zip(alive[0::2], alive[1::2]):
+            sa, sb = res[a]["best"]["score"], res[b]["best"]["score"]; w = a if sa >= sb else b
+            bracket.append({"round": rnd, "a": a, "b": b, "score_a": sa, "score_b": sb, "winner": w}); nxt.append(w)
+        alive, rnd = nxt, rnd + 1
+    ctx_r = {"n": nrm, "lab": ctx["lab"], "chroma": T.chroma(panel), "joints": joints}
+    tiles_r, lab_r, tiles_b, lab_b = [panel], ["panneau (entrée)"], [albedo, lit], ["vérité du banc", "banc éclairé (bandes nettes)"]
+    for code, name, fn, phases in methods:
+        s = res[code]["best"]["param"]
+        o = T.expose_like(T.apply(panel, ctx_r, fn, s), panel); tiles_r.append(o); lab_r.append(f"{code} {name}\nparam {s}  banc {res[code]['best']['score']}")
+        Image.fromarray((T.to_srgb(o) * 255).astype(np.uint8)).save(f"{out}/real2_{code}.png")
+        tiles_b.append(T.apply(lit, ctx, fn, s)); lab_b.append(f"{code} {name}\nscore {res[code]['best']['score']}")
+    T.board(tiles_r, f"{out}/sheet2_real_panel.png", lab_r)
+    T.board(tiles_b, f"{out}/sheet2_bench.png", lab_b)
+    Image.fromarray((joints * 255).astype(np.uint8)).save(f"{out}/joints_from_height.png")
+    json.dump({"methods": res, "bracket": bracket, "winner": alive[0], "verifier": chk, "params": P2}, open(f"{out}/tournament2.json", "w"), indent=1, ensure_ascii=False)
+    print("winner", alive[0]); [print(b) for b in bracket]
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

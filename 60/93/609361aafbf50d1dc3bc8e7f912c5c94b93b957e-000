@@ -1,0 +1,151 @@
+# APPLY : consigner localement la synthèse Zorah et la règle SVG (3 November 2026)
+
+Gestes ordonnés pour la session locale du Mac. Branche source : `cloud/zorah-synthesis-3-november-2026` du dépôt `matthieuhuguet/Memory`. La branche `main` n'est pas touchée. Chaque étape dit quoi faire, puis comment savoir que c'est fait.
+
+Dossier atelier : `/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/`.
+
+## 0. État de départ
+
+```bash
+wc -c /Users/zenray/.claude/CLAUDE.md
+```
+
+Attendu : 64823. Si le nombre diffère, `CLAUDE.md` a bougé depuis le handoff : la ligne de pointeur pèse 246 octets, le total doit rester sous 65536.
+
+```bash
+ls -la /Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/
+```
+
+Regarder ce qui existe avant d'écrire : l'étape 2 garde une copie `.avant-cloud` de tout fichier qu'elle remplace.
+
+## 1. Récupérer les sorties du cloud
+
+```bash
+python3 /Users/zenray/.claude/skills/zenray-cloud-handoff/scripts/Handoff.py pull --branch cloud/zorah-synthesis-3-november-2026 --folder Projects/zorah-materials/handoff/synthesis-svg-3-November-2026/out --dest /Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/cloud-pull-3-November-2026
+```
+
+Piège lu dans `Handoff.py` : `pull` extrait le dossier avec tout son chemin de dépôt. Les fichiers arrivent donc dans `/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/cloud-pull-3-November-2026/Projects/zorah-materials/handoff/synthesis-svg-3-November-2026/out/`, pas directement dans `--dest`. L'arbre de travail de `Memory1` n'est pas modifié (seulement `git fetch`).
+
+```bash
+shasum -a 256 /Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/cloud-pull-3-November-2026/Projects/zorah-materials/handoff/synthesis-svg-3-November-2026/out/value-chain.svg /Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/cloud-pull-3-November-2026/Projects/zorah-materials/handoff/synthesis-svg-3-November-2026/out/Synthesis.html /Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/cloud-pull-3-November-2026/Projects/zorah-materials/handoff/synthesis-svg-3-November-2026/out/RULE.md /Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/cloud-pull-3-November-2026/Projects/zorah-materials/handoff/synthesis-svg-3-November-2026/out/build/BuildSynthesis.py
+```
+
+Attendu, empreintes des fichiers poussés par la session cloud :
+
+| Fichier | Octets | sha256 |
+|---|---|---|
+| `value-chain.svg` | 102416 | `61102e93ee090462a1bdc0c4f02a21949a463b1553010c9fcc28446cb9afb000` |
+| `Synthesis.html` | 4629847 | `c8edbed02fc5bf545e0d60c09741d51ad56d6a92c3f26b957c775a03baa52248` |
+| `RULE.md` | 6907 | `1e722cdc509618a04bc6729ad361324bbc39196980fd8136dc32a04cdbf6fab6` |
+| `build/BuildSynthesis.py` | 65303 | `91e17faaa8d042dd55b570c7c9bf647ff0dcfb13f5e89a0d3d26dae047c90068` |
+
+`APPLY.md` ne peut pas porter sa propre empreinte ; `git log` de la branche la donne.
+
+## 2. Poser les fichiers dans l'atelier
+
+```bash
+rsync -a --backup --suffix=.avant-cloud /Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/cloud-pull-3-November-2026/Projects/zorah-materials/handoff/synthesis-svg-3-November-2026/out/ /Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/
+```
+
+Résultat : `Articles/value-chain.svg`, `Articles/Synthesis.html`, `Articles/RULE.md`, `Articles/APPLY.md` et `Articles/build/BuildSynthesis.py`. Le générateur doit rester dans `Articles/build/`, à côté des quatre fichiers qu'il contrôle.
+
+## 3. Vérifier dans l'atelier
+
+```bash
+python3 /Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/build/BuildSynthesis.py verify
+```
+
+Bibliothèque standard seulement. Attendu : `VERDICT OK`, code de sortie 0, `--json` pour une machine. Hors du dépôt, le script relit les JSON de mesure dans `/Users/zenray/.claude/Memory1/Projects/zorah-materials/handoff/synthesis-svg-3-November-2026/files/`, sinon dans les originaux sous `/Users/zenray/.claude/`, et recalcule les cinq chiffres du schéma (0,67, 0,80, 0,9775, 0,9844, 0,9906). Il contrôle aussi : aucune ressource externe, polices et neuf figures en base64, schéma avant la première section, ponctuation, lignes de `RULE.md` datées, poids de `CLAUDE.md`, absence de secret.
+
+```bash
+python3 /Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/build/BuildSynthesis.py selftest
+```
+
+Attendu : `"green_on_real": true` et cinq `true` dans `red_on_broken` (police externe, tiret cadratin, chiffre dérivé, ligne non datée, figure manquante).
+
+Regarder ensuite `Articles/Synthesis.html` et `Articles/value-chain.svg` dans le navigateur intégré ou un Chromium isolé, jamais le navigateur personnel, en grand et à 390 px de large. Mesuré dans le cloud : 73 textes du schéma dans leurs boîtes, aucune requête réseau, aucun défilement horizontal de la page, détails fermés à l'ouverture.
+
+Quand les deux commandes sont vertes, le dossier de transit peut partir :
+
+```bash
+rm -rf /Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/cloud-pull-3-November-2026
+```
+
+## 4. Contrat zenray-edit
+
+Coller le bloc 3 de `RULE.md` à la fin de `/Users/zenray/.claude/skills/zenray-edit/references/ProjectSynthesis.md`, après la section `## État vérifié lors de la consignation (1 November 2026)`, précédé d'une ligne vide. Puis :
+
+```bash
+~/.claude/skills/skill-sync/scripts/sync-skill.sh zenray-edit
+```
+
+```bash
+grep -c "^## Diagramme SVG récapitulatif (3 November 2026)" /Users/zenray/.claude/skills/zenray-edit/references/ProjectSynthesis.md /Users/zenray/.codex/skills/zenray-edit/references/ProjectSynthesis.md
+```
+
+Attendu : 1 pour chaque fichier.
+
+## 5. Chaîne zenray-houdini
+
+```bash
+cp /Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/value-chain.svg /Users/zenray/.claude/skills/zenray-houdini/templates/zenray-height-from-map/value-chain.svg
+```
+
+Coller le bloc 4 de `RULE.md` à la fin de `/Users/zenray/.claude/skills/zenray-houdini/templates/zenray-height-from-map/prompt_height_chain.md`, précédé d'une ligne vide. Puis :
+
+```bash
+~/.claude/skills/skill-sync/scripts/sync-skill.sh zenray-houdini
+```
+
+```bash
+shasum -a 256 /Users/zenray/.claude/skills/zenray-houdini/templates/zenray-height-from-map/value-chain.svg /Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/value-chain.svg
+```
+
+Attendu : deux empreintes identiques, `61102e93…afb000`.
+
+## 6. Règle et pointeur
+
+Trouver d'abord le fichier qui porte déjà la règle des synthèses HTML :
+
+```bash
+grep -n -i "synthèse HTML\|ProjectSynthesis" /Users/zenray/.claude/rules/ZenRayProjects1.md /Users/zenray/.claude/rules/SkillsAndMemory1.md
+```
+
+Par défaut, coller le bloc 2 de `RULE.md` à la fin de `/Users/zenray/.claude/rules/ZenRayProjects1.md`. Si seules des lignes de `SkillsAndMemory1.md` sortent, le coller là et remplacer `ZenRayProjects1.md` par `SkillsAndMemory1.md` dans le pointeur.
+
+Puis insérer le bloc 1 de `RULE.md`, une seule ligne, dans `/Users/zenray/.claude/CLAUDE.md`, en dernière puce de la section `## PRIORITÉ 0 : synthèse HTML visuelle et horodatée (1 November 2026)`.
+
+```bash
+wc -c /Users/zenray/.claude/CLAUDE.md
+```
+
+Attendu : 65069 si l'étape 0 donnait 64823, toujours sous 65536.
+
+```bash
+node /Users/zenray/.claude/skills/claude-md-global/scripts/extract-rules.mjs --verify
+```
+
+Attendu : vert. Régénérer ensuite les miroirs de `CLAUDE.md` par `mirror-agents.sh`, comme d'habitude ; la session cloud ne connaît pas son chemin.
+
+## 7. Assets, journal et suivi
+
+La synthèse devient l'article déclaré du projet zorah-materials, selon la PRIORITÉ 0 « synthèse HTML visuelle et horodatée » de `CLAUDE.md` : `set-article` sur `Articles/Synthesis.html`, `IndexMapping.json` et `ProjectInfo.json`, puis archive et publication vérifiées (`requestAssets({ action: 'publish' })`). Les commandes exactes sont celles du skill zenray-assets, que la session cloud n'a pas lues. Une fois l'article lié, les identifiants Assets et les dates de modification de l'inventaire, notés « non fourni » et « non mesurée », peuvent remplacer ces mentions par une reconstruction.
+
+Reconstruction, si besoin (Pillow requis, fontTools facultatif ; les entrées gardent leur date du 3 November 2026, 23:53 +0100) :
+
+```bash
+/Users/zenray/.venvs/zenray-uv/bin/python /Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/build/BuildSynthesis.py build
+```
+
+Journal : une entrée par le skill `progress` dans `/Users/zenray/.claude/PROGRESS.md`, et la demande de Matthieu avec ses preuves dans `/Users/zenray/.claude/Memory1/Projects/zorah-materials/FEEDBACK.md` par le skill zenray-feedback.
+
+## 8. Fini quand
+
+| Contrôle | Attendu |
+|---|---|
+| `BuildSynthesis.py verify` dans l'atelier | `VERDICT OK`, code 0 |
+| `BuildSynthesis.py selftest` | vert sur le vrai, rouge sur les cinq copies cassées |
+| section SVG dans `ProjectSynthesis.md`, source et copie Codex | 1 et 1 |
+| `value-chain.svg` dans zenray-houdini | même empreinte que dans l'atelier |
+| `CLAUDE.md` | moins de 65536 octets, `extract-rules.mjs --verify` vert |
+| article Assets | lié, publié, reçu d'archive relu |

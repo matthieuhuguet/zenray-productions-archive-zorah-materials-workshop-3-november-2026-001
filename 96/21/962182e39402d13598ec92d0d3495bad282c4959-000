@@ -1,0 +1,55 @@
+# 3 November 2026, 22:05 : frequency merge test, details from the step 1 Python height, shading from the AI corrected height.
+# FR : test de fusion par fréquences, détails de la height Python de l'étape 1, ombrage de la height corrigée par l'IA.
+# final = highpass(step1, sigma) + lowpass(ai, sigma) ; sigma in px for a 2048 px image, scaled with the image.
+# Usage : python -I FrequencyMerge.py <step1.png> <out_dir> <ai1.png> <ai2.png> [...]
+import json
+import sys
+import numpy as np
+from PIL import Image
+sys.path.insert(0, "/Users/zenray/.claude/skills/zenray-houdini/scripts/height")
+from Dearc import gblur, plank_arc, corr, narrow  # noqa: E402
+
+SIGMAS = [8.0, 16.0, 32.0, 64.0]
+
+
+def load(path, shape=None):
+    im = Image.open(path)
+    a = np.asarray(im).astype(np.float64)
+    a /= 65535.0 if a.max() > 255 else 255.0
+    a = a[..., :3].mean(axis=2) if a.ndim == 3 else a
+    if shape is not None and a.shape != shape:
+        a = np.asarray(Image.fromarray(a.astype(np.float32), mode="F").resize((shape[1], shape[0]), Image.BICUBIC)).astype(np.float64)
+    return a
+
+
+def merge(step1, ai, sigma_px):
+    s = sigma_px * step1.shape[0] / 2048.0
+    return (step1 - gblur(step1, s)) + gblur(ai, s)
+
+
+def main(argv):
+    step1 = load(argv[0]); out = argv[1]; ais = [load(p, step1.shape) for p in argv[2:]]
+    names = [p.split("/")[-1] for p in argv[2:]]
+    r = {"step1_arc": plank_arc(step1)[0], "ai": {}, "merge": {}}
+    for n, a in zip(names, ais):
+        r["ai"][n] = {"arc": plank_arc(a)[0], "detail_vs_step1": corr(narrow(a), narrow(step1))}
+    pairs = [(i, j) for i in range(len(ais)) for j in range(i + 1, len(ais))]
+    r["ai_pairs_likeness"] = {f"{names[i]}~{names[j]}": corr(ais[i], ais[j]) for i, j in pairs}
+    for s in SIGMAS:
+        ms = [merge(step1, a, s) for a in ais]
+        r["merge"][f"sigma {s:g}"] = {
+            "arc": {n: plank_arc(m)[0] for n, m in zip(names, ms)},
+            "detail_vs_step1": {n: corr(narrow(m), narrow(step1)) for n, m in zip(names, ms)},
+            "pairs_likeness": {f"{names[i]}~{names[j]}": corr(ms[i], ms[j]) for i, j in pairs},
+            "pairs_mean_abs_diff": {f"{names[i]}~{names[j]}": float(np.abs(ms[i] - ms[j]).mean()) for i, j in pairs},
+        }
+        if s == 16.0:
+            for n, m in zip(names, ms):
+                lo, hi = np.percentile(m, [0.1, 99.9])
+                Image.fromarray((np.clip((m - lo) / (hi - lo), 0, 1) * 65535).astype(np.uint16)).save(f"{out}/merge16_{n}")
+    json.dump(r, open(f"{out}/frequency_merge.json", "w"), indent=1)
+    print(json.dumps(r, indent=1))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

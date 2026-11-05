@@ -1,0 +1,55 @@
+# Prompt height ChatGPT, Zorah Materials (3 November 2026)
+
+## Workflow height 8 (3 November 2026, 20:35 +0100), règle de Matthieu
+
+- Pour les 8 (height), on n'utilise plus la génération d'image, sauf si l'on n'a pas de référence totalement droite.
+- Si la référence est totalement droite (carré plat, sans cylindre ni bandeau), on utilise seulement le paragraphe Python du prompt final, envoyé à ChatGPT.
+- Les demandes se font en un chat séquentiel : une image après l'autre dans la même conversation, jamais en parallèle.
+- Référence validée : `textures/final/6.png` (1869 × 1868, 16 bits gris, « bon » selon Matthieu). Reproduction ZenRay Height lancée sur cette image, dans une scène Houdini FX ouverte, CPU complet.
+
+## Version finale (3 November 2026, 19:56 +0100), validée par Matthieu
+
+Les deux paragraphes partent ensemble, dans un seul message à ChatGPT, avec le carré découpé joint (`Sources/artstation-eRZ01X/textures/panels/zorah-0N-panel.png`, jamais la planche entière). Résultat constaté par Matthieu : une height quasi parfaite. Contrôle ensuite par `CheckAiHeight.py`.
+
+```text
+Fais la height map de cette image : même cadrage, chaque détail exactement à la même place, pixel pour pixel. Niveaux de gris : blanc = haut, noir = creux. Sans lumière, sans ombre, sans couleur. then redo with 99.9% precision in the composition.
+N'utilise pas la génération d'image. En Python, calcule la height map de cette image : niveaux de gris, puis retire l'éclairage de grande échelle par un filtre passe-haut, même taille, PNG 16 bits. then redo with 99.9% precision in the composition.
+```
+
+## Version 3 (3 November 2026, 19:42 +0100), remplacée par la version finale : prompt simple
+
+Joindre le carré découpé `Sources/artstation-eRZ01X/textures/panels/zorah-0N-panel.png`, jamais la planche entière.
+
+A. Génération d'image :
+
+```text
+Fais la height map de cette image : même cadrage, chaque détail exactement à la même place, pixel pour pixel. Niveaux de gris : blanc = haut, noir = creux. Sans lumière, sans ombre, sans couleur. then redo with 99.9% precision in the composition.
+```
+
+B. Calcul en Python (placement exact, détails complets, mais une tache sombre devient un creux) :
+
+```text
+N'utilise pas la génération d'image. En Python, calcule la height map de cette image : niveaux de gris, puis retire l'éclairage de grande échelle par un filtre passe-haut, même taille, PNG 16 bits. then redo with 99.9% precision in the composition.
+```
+
+## Version 2 (3 November 2026, 18:58 +0100), remplacée par la version 3
+
+Une image par appel : joindre l'image de référence, remplacer `[matériau]` et les deux listes entre crochets (ce qui est en creux, ce qui est en relief), puis lancer. Matthieu génère lui-même l'image, l'agent ne génère rien. Contrôler ensuite le résultat avec `CheckAiHeight.py`. Bilan : `Analysis/ai-height-lighting-3-November-2026/REPORT.md`.
+
+```text
+Entrée = l'image jointe, rendu de présentation éclairé de [matériau] (spot, ombres, reflets, teintes) : n'en garder que la forme, la taille et la répartition des détails, jamais ses valeurs de gris ni sa lumière ; sortie = texture répétable Height de [matériau], carte de hauteur non éclairée (displacement map), aspect sortie Height brute de Substance Designer AAA ; format carré 1:1, plein cadre, vue de dessus orthographique ; niveaux de gris linéaires : chaque pixel code uniquement l'altitude de la surface en ce point, jamais sa pente ni son orientation, si bien que deux pentes à la même hauteur ont le même gris, quel que soit leur côté ; gris moyen = surface de base, plus clair = plus haut, plus sombre = plus creux ; en creux, donc plus sombres que leur voisinage : [joints, fissures, rainures, pores, éclats] ; en relief, donc plus clairs : [arêtes saillantes, grains, bourrelets, ou rien] ; la face d'une pierre ou d'un bloc est un plateau presque uniforme, du même gris que les autres faces de même relief ; chaque creux a un profil symétrique, sombre au fond, sans trait clair sur aucun de ses bords ; chaque arête passe d'un niveau à l'autre par un dégradé, sans liseré blanc ni liseré noir ; les taches, la rouille, la saleté et les différences de teinte ne créent aucun relief ; même gris moyen dans les quatre quarts de l'image ; l'image retournée de 180 degrés reste une height juste ; raccord sur les quatre bords ; sans éclairage ; sans direction de lumière ; sans ombre propre ni ombre portée ; sans reflet ; sans liseré ni biseau éclairé ; sans effet emboss ; sans AO ; sans curvature ; sans couleur ni variation de teinte reprise de la référence ; sans dégradé ni cône de lumière ; sans perspective ; sans texte ; sans légende. then redo with 99.9% precision in the composition.
+```
+
+Exemple de listes pour les pierres de Zorah : en creux = joints, fissures, éclats, pores ; en relief = rien.
+
+## Historique (3 November 2026), version 1, remplacée par la version 2
+
+Une image par appel : joindre l'image de `Sources/artstation-eRZ01X/`, remplacer `[matériau]` par le nom de la matière visible, puis lancer. Matthieu génère lui-même l'image, l'agent ne génère rien.
+
+```text
+Entrée = l'image jointe (référence) ; sortie = texture répétable Height de [matériau], aspect export brut Substance Designer AAA ; résolution = 4096 × 4096, format carré 1:1 ; encodage cible = niveaux de gris linéaires, 16 bits ; représenter uniquement la hauteur : blanc = haut, noir = creux ; conserver la même échelle de hauteur partout ; respecter la référence ; remplir entièrement le cadre ; raccord sur les quatre bords ; sans éclairage ; sans ombres ; sans AO ; sans reflets ; sans couleur ; sans perspective ; sans texte ; sans légende. then redo with 99.9% precision in the composition.
+```
+
+Si la référence est une trim sheet (profils alignés en bandes), remplacer « texture répétable » par « trim sheet » et « raccord sur les quatre bords » par « raccord gauche-droite de chaque bande ».
+
+Le fichier rendu se contrôle avant usage : 4096 × 4096, niveaux de gris, et 16 bits si ChatGPT le livre. Sinon noter le format réel dans `FEEDBACK.md`.

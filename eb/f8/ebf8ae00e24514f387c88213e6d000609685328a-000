@@ -1,0 +1,64 @@
+# 4 November 2026, 02:10 : how much colour information each base color keeps, against the panel it comes from.
+# FR : combien d'information de couleur chaque base color garde, face au panneau d'origine.
+# Lab metrics : chroma (saturation), fine colour detail, block tints, shading left (very broad L), fine L detail and its
+# correlation with the panel (same framing). Usage : python -I BaseColorInfo.py <panel> <out.json> name=path ...
+import json
+import sys
+
+import numpy as np
+from PIL import Image
+
+SIZE = 1024
+
+
+def lab(path):
+    a = np.asarray(Image.open(path).convert("RGB").resize((SIZE, SIZE), Image.LANCZOS)).astype(np.float64) / 255.0
+    lin = np.where(a <= 0.04045, a / 12.92, ((a + 0.055) / 1.055) ** 2.4)
+    M = np.array([[0.4124, 0.3576, 0.1805], [0.2126, 0.7152, 0.0722], [0.0193, 0.1192, 0.9505]])
+    xyz = lin @ M.T / np.array([0.9505, 1.0, 1.089])
+    f = np.where(xyz > 0.008856, np.cbrt(xyz), 7.787 * xyz + 16 / 116)
+    return np.stack([116 * f[..., 1] - 16, 500 * (f[..., 0] - f[..., 1]), 200 * (f[..., 1] - f[..., 2])], -1)
+
+
+def blur(x, s):
+    fy = np.fft.fftfreq(x.shape[0])[:, None]; fx = np.fft.rfftfreq(x.shape[1])[None, :]
+    return np.fft.irfft2(np.fft.rfft2(x) * np.exp(-2 * np.pi ** 2 * s * s * (fx ** 2 + fy ** 2)), s=x.shape)
+
+
+def corr(a, b):
+    a = a - a.mean(); b = b - b.mean()
+    return float((a * b).sum() / np.sqrt((a * a).sum() * (b * b).sum()))
+
+
+def info(L, panel_L):
+    l, a, b = L[..., 0], L[..., 1], L[..., 2]
+    C = np.hypot(a, b)
+    hp = lambda x: x - blur(x, 3)
+    return {
+        "L_mean": round(float(l.mean()), 1),
+        "chroma_mean": round(float(C.mean()), 2),
+        "chroma_p95": round(float(np.percentile(C, 95)), 2),
+        "colour_fine_detail": round(float(np.hypot(hp(a), hp(b)).mean()), 3),
+        "block_tint_std": round(float(np.hypot(blur(a, 24) - blur(a, 24).mean(), blur(b, 24) - blur(b, 24).mean()).mean()), 3),
+        "shading_left_L_std": round(float(blur(l, 128).std()), 2),
+        "L_fine_detail_std": round(float(hp(l).std()), 2),
+        "L_fine_corr_panel": round(corr(hp(l), hp(panel_L)), 3),
+        "L_mid_corr_panel": round(corr(blur(l, 3) - blur(l, 32), blur(panel_L, 3) - blur(panel_L, 32)), 3),
+    }
+
+
+def main(panel, out, items):
+    pl = lab(panel)
+    rep = {"panel": info(pl, pl[..., 0])}
+    for it in items:
+        k, v = it.split("=", 1)
+        rep[k] = info(lab(v), pl[..., 0])
+    json.dump(rep, open(out, "w"), indent=1)
+    keys = list(rep["panel"])
+    print("name".ljust(14) + "".join(k[:18].rjust(19) for k in keys))
+    for k, v in rep.items():
+        print(k.ljust(14) + "".join(str(v[x]).rjust(19) for x in keys))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1], sys.argv[2], sys.argv[3:])

@@ -1,0 +1,84 @@
+# 4 November 2026, 00:12 : anchor the exposure of base colours on a PBR albedo value, in linear light, then compare.
+# FR : caler l'exposition des base colors sur un albédo PBR, en lumière linéaire (teinte et saturation gardées), puis comparer.
+# Light is multiplicative : one gain k on the linear RGB moves the brightness and keeps the chromaticity of every pixel.
+# Usage : /Users/zenray/.venvs/zenray-uv/bin/python -I BaseColorExposure.py <out_dir> <b1.png> <b2.png> [...]
+import itertools
+import json
+import sys
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+
+P = {"targets_srgb": [116, 135, 160], "pbr_range_srgb": [50, 243]}  # 116 sandstone, 122-147 aged concrete (charts) ; 160 test
+
+
+def to_lin(a):
+    return np.where(a <= 0.04045, a / 12.92, ((a + 0.055) / 1.055) ** 2.4)
+
+
+def to_srgb(l):
+    l = np.clip(l, 0, 1)
+    return np.where(l <= 0.0031308, l * 12.92, 1.055 * l ** (1 / 2.4) - 0.055)
+
+
+def luminance(lin):
+    return lin @ np.array([0.2126, 0.7152, 0.0722])
+
+
+def expose(rgb, target_srgb):
+    lin = to_lin(rgb)
+    want = to_lin(np.array(target_srgb / 255.0))
+    k = want / max(float(luminance(lin).mean()), 1e-6)
+    return to_srgb(lin * k), k
+
+
+def gblur(a, s):
+    fy = np.fft.fftfreq(a.shape[0])[:, None]; fx = np.fft.rfftfreq(a.shape[1])[None, :]
+    return np.fft.irfft2(np.fft.rfft2(a) * np.exp(-2 * np.pi ** 2 * s ** 2 * (fx ** 2 + fy ** 2)), s=a.shape)
+
+
+def gap(x, y):
+    w = x.shape[1]
+    return float(np.mean(np.abs(np.stack([gblur(x[..., c], w / 128) - gblur(y[..., c], w / 128) for c in range(3)], -1)) * 255))
+
+
+def describe(rgb):
+    s = luminance(to_lin(rgb)); s8 = to_srgb(s) * 255
+    lo, hi = P["pbr_range_srgb"]
+    out = float(((rgb * 255 < lo).all(-1) | (rgb * 255 > hi).any(-1)).mean())
+    return {"mean_srgb": round(float(to_srgb(np.array(s.mean())) * 255), 1), "p2": round(float(np.percentile(s8, 2)), 1),
+            "p98": round(float(np.percentile(s8, 98)), 1), "outside_pbr_range": round(out, 4)}
+
+
+def main(out, paths):
+    ins = [np.asarray(Image.open(p).convert("RGB")).astype(np.float64) / 255 for p in paths]
+    names = [p.split("/")[-1] for p in paths]
+    rows = [("entrée", ins)]
+    rep = {"entrée": {"images": {n: describe(a) for n, a in zip(names, ins)},
+                      "gap_mean_srgb": round(float(np.mean([gap(x, y) for x, y in itertools.combinations(ins, 2)])), 2)}}
+    for t in P["targets_srgb"]:
+        outs = [expose(a, t)[0] for a in ins]
+        rows.append((f"albédo calé à {t} sRGB", outs))
+        rep[f"target {t}"] = {"images": {n: describe(o) for n, o in zip(names, outs)},
+                              "gap_mean_srgb": round(float(np.mean([gap(x, y) for x, y in itertools.combinations(outs, 2)])), 2)}
+        for n, o in zip(names, outs):
+            Image.fromarray((o * 255 + 0.5).astype(np.uint8)).save(f"{out}/exp{t}_{n}")
+    c = 460
+    try:
+        font = ImageFont.truetype("/Users/zenray/Library/Fonts/GT-Ultra-Standard-Regular.otf", 18)
+    except OSError:
+        font = ImageFont.load_default()
+    sheet = Image.new("RGB", (len(paths) * (c + 8), len(rows) * (c + 32)), (0, 0, 0))
+    for r, (lab, imgs) in enumerate(rows):
+        key = "entrée" if r == 0 else f"target {P['targets_srgb'][r - 1]}"
+        means = " / ".join(str(v["mean_srgb"]) for v in rep[key]["images"].values())
+        ImageDraw.Draw(sheet).text((6, r * (c + 32) + 7), f"{lab}   moyennes {means} sRGB   écart entre générations {rep[key]['gap_mean_srgb']}", fill=(255, 255, 255), font=font)
+        for i, im in enumerate(imgs):
+            sheet.paste(Image.fromarray((im * 255).astype(np.uint8)).resize((c, c)), (i * (c + 8), r * (c + 32) + 32))
+    sheet.save(f"{out}/basecolor_exposure_board.png")
+    json.dump(rep, open(f"{out}/basecolor_exposure.json", "w"), indent=1, ensure_ascii=False)
+    print(json.dumps(rep, indent=1, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1], sys.argv[2:])

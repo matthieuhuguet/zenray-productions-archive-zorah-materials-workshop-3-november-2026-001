@@ -1,0 +1,45 @@
+# 3 November 2026, 23:25 : second round : calm the pixel grain where the generations disagree (gaussian, median), after the rolling ball.
+# FR : deuxième tour : calmer le grain au pixel, là où les générations divergent (flou gaussien, médian), après la rolling ball.
+import itertools
+import json
+import sys
+
+import numpy as np
+from scipy import ndimage
+
+sys.path.insert(0, "/Users/zenray/.claude/skills/zenray-houdini/scripts/height")
+import RollingBallTop as R  # noqa: E402
+
+
+def run(ins, f):
+    outs = [R.levels(f(R.uniformise(a)), R.P) for a in ins]
+    pairs = [R.corr(x, y) for x, y in itertools.combinations(outs, 2)]
+    mid = [R.corr(R.gblur(o, 2) - R.gblur(o, 8), R.gblur(R.levels(a, R.P), 2) - R.gblur(R.levels(a, R.P), 8)) for a, o in zip(ins, outs)]
+    return outs, {"pairs_mean": round(float(np.mean(pairs)), 4), "pairs": [round(p, 4) for p in pairs],
+                  "detail_2_8px_kept": [round(m, 3) for m in mid], "shading": [round(R.shading(o), 3) for o in outs]}
+
+
+def main(out, paths):
+    ins = [R.load(p) for p in paths]
+    k = ins[0].shape[1] / 2048
+    tests = {
+        "V0 rolling ball": lambda o: o,
+        "G1 + flou 1 px": lambda o: R.gblur(o, 1.0 * k),
+        "G1.5 + flou 1,5 px": lambda o: R.gblur(o, 1.5 * k),
+        "G2 + flou 2 px": lambda o: R.gblur(o, 2.0 * k),
+        "M3 + médian 3 px": lambda o: ndimage.median_filter(o, size=3, mode="wrap"),
+        "M5 + médian 5 px": lambda o: ndimage.median_filter(o, size=5, mode="wrap"),
+        "M3G1 + médian 3 px + flou 1 px": lambda o: R.gblur(ndimage.median_filter(o, size=3, mode="wrap"), 1.0 * k),
+    }
+    rep = {}
+    for n, f in tests.items():
+        outs, rep[n] = run(ins, f)
+        print(n, rep[n], flush=True)
+        if n.startswith(("M3G1", "G1.5")):
+            for p, o in zip(paths, outs):
+                R.save16(o, f"{sys.argv[1].rsplit('/', 1)[0]}/{n.split()[0]}_{p.split('/')[-1]}")
+    json.dump(rep, open(out, "w"), indent=1)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1], sys.argv[2:])

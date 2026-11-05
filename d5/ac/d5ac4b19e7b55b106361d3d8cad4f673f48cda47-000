@@ -1,0 +1,110 @@
+{
+ "V0 rolling ball": {
+  "pairs_mean": 0.666,
+  "pairs": [
+   0.6684,
+   0.6568,
+   0.6728
+  ],
+  "shading": [
+   0.083,
+   0.08,
+   0.081
+  ],
+  "fine_detail_kept": [
+   1.0,
+   1.0,
+   1.0
+  ]
+ },
+ "V1 boule 1/64": {
+  "pairs_mean": 0.6653,
+  "pairs": [
+   0.668,
+   0.6562,
+   0.6718
+  ],
+  "shading": [
+   0.046,
+   0.047,
+   0.052
+  ],
+  "fine_detail_kept": [
+   0.999,
+   0.999,
+   1.0
+  ]
+ },
+ "V2 contraste local": {
+  "pairs_mean": 0.6374,
+  "pairs": [
+   0.6363,
+   0.6285,
+   0.6473
+  ],
+  "shading": [
+   0.017,
+   0.018,
+   0.018
+  ],
+  "fine_detail_kept": [
+   0.988,
+   0.99,
+   0.995
+  ]
+ },
+ "V3 contraste local + histo": {
+  "pairs_mean": 0.6199,
+  "pairs": [
+   0.6165,
+   0.6141,
+   0.6293
+  ],
+  "shading": [
+   0.013,
+   0.014,
+   0.016
+  ],
+  "fine_detail_kept": [
+   0.928,
+   0.927,
+   0.958
+  ]
+ },
+ "V4 1/64 + contraste local + histo": {
+  "pairs_mean": 0.6226,
+  "pairs": [
+   0.6193,
+   0.6167,
+   0.6316
+  ],
+  "shading": [
+   0.012,
+   0.014,
+   0.017
+  ],
+  "fine_detail_kept": [
+   0.929,
+   0.928,
+   0.958
+  ]
+ },
+ "V5 1/64 + contraste local + histo + flou 1px": {
+  "pairs_mean": 0.7169,
+  "pairs": [
+   0.7162,
+   0.7093,
+   0.7251
+  ],
+  "shading": [
+   0.017,
+   0.02,
+   0.024
+  ],
+  "fine_detail_kept": [
+   0.902,
+   0.905,
+   0.93
+  ]
+ }
+}

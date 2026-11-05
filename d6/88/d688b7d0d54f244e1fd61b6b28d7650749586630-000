@@ -1,0 +1,84 @@
+# 3 November 2026, 18:55 : average cross-section through the horizontal joints of each AI height.
+# FR : coupe moyenne à travers les joints horizontaux de chaque height générée.
+import json
+import pathlib
+import runpy
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+
+ROOT = pathlib.Path("/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026")
+A = runpy.run_path(str(ROOT / "Scripts/AnalyseAiHeights.py"))  # reuse load, resize, gblur, synthetic, shade
+OUT = A["OUT"]
+FONT = ImageFont.truetype("/Users/zenray/Library/Fonts/GT-Ultra-Standard-Regular.otf", 13)
+P = {"half": 14, "min_gap": 40, "depth_k": 2.0, "plot_w": 300, "plot_h": 160}
+
+
+def profile(img):
+    rows = img.mean(axis=1)
+    base = np.convolve(np.r_[rows[-30:], rows, rows[:30]], np.ones(61) / 61, mode="same")[30:-30]
+    r = rows - base
+    h = P["half"]
+    mins = [i for i in range(h, len(r) - h) if r[i] == r[i - h:i + h + 1].min() and r[i] < -P["depth_k"] * r.std()]
+    keep = []
+    for i in mins:
+        if not keep or i - keep[-1] >= P["min_gap"]:
+            keep.append(i)
+    if not keep:
+        return None, 0
+    prof = np.mean([r[i - h:i + h + 1] for i in keep], axis=0)
+    return prof, len(keep)
+
+
+def asymmetry(prof):
+    h = P["half"]
+    depth = -prof[h]
+    above, below = prof[:h].max(), prof[h + 1:].max()
+    return float((above - below) / depth), float(above / depth), float(below / depth)
+
+
+def plot(prof, title, sub):
+    w, hh = P["plot_w"], P["plot_h"]
+    im = Image.new("RGB", (w, hh), (24, 24, 24))
+    dr = ImageDraw.Draw(im)
+    dr.text((8, 6), title, fill=(235, 235, 235), font=FONT)
+    dr.text((8, 22), sub, fill=(190, 190, 190), font=FONT)
+    if prof is None:
+        return im
+    p = prof / max(abs(prof).max(), 1e-9)
+    zy = hh // 2 + 20
+    dr.line([10, zy, w - 10, zy], fill=(80, 80, 80))
+    pts = [(10 + i * (w - 20) / (len(p) - 1), zy - v * 50) for i, v in enumerate(p)]
+    dr.line(pts, fill=(235, 90, 60), width=2)
+    dr.text((10, hh - 18), "dessus du joint", fill=(150, 150, 150), font=FONT)
+    dr.text((w - 110, hh - 18), "dessous du joint", fill=(150, 150, 150), font=FONT)
+    return im
+
+
+def main():
+    items = []
+    for name in ("aigen3", "aigen4", "aigen6", "aigen1", "aigen2"):
+        items.append((name, A["load"](A["AIGEN"] / f"{name}.png")))
+    syn = A["synthetic"](1024)
+    items += [("synthetic height", syn), ("same height, lit", A["shade"](syn))]
+    plots, res = [], {}
+    for name, img in items:
+        prof, count = profile(img)
+        if prof is None:
+            res[name] = {"joints": 0}
+            plots.append(plot(None, name, "aucun joint horizontal net"))
+            continue
+        asym, up, down = asymmetry(prof)
+        res[name] = {"joints": count, "asymmetry": asym, "peak_above": up, "peak_below": down}
+        plots.append(plot(prof, name, f"{count} joints, asymétrie {asym:+.2f}"))
+    board = Image.new("RGB", (P["plot_w"] * 4, P["plot_h"] * 2), (24, 24, 24))
+    for i, im in enumerate(plots):
+        board.paste(im, ((i % 4) * P["plot_w"], (i // 4) * P["plot_h"]))
+    board.save(OUT / "joint_profiles.png")
+    (OUT / "joint_profiles.json").write_text(json.dumps(res, indent=2), encoding="utf-8")
+    for k, v in res.items():
+        print(k.ljust(18), v)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,98 @@
+# 4 November 2026, 00:15 : tournament of eight dynamic brightness methods for base colours (no absolute value : every target is measured on the images).
+# FR : tournoi de huit méthodes dynamiques de luminosité pour les base colors ; chaque cible se mesure sur les images, jamais une valeur absolue.
+# Usage : /Users/zenray/.venvs/zenray-uv/bin/python -I BrightnessTournament.py <out_dir> <reference.png> <height.png> <b1.png> <b2.png> [...]
+import itertools
+import json
+import sys
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+
+sys.path.insert(0, "/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Scripts")
+from BaseColorExposure import to_lin, to_srgb, luminance, gblur, gap, describe  # noqa: E402
+
+P = {"size": 1024, "illum_scale": 1 / 8, "key_pct": 90, "lit_pct": 75, "white_pct": 99, "top_pct": 70}
+
+
+def load(p, size, grey=False):
+    im = Image.open(p)
+    if grey:
+        a = np.asarray(im).astype(np.float64); a /= 65535.0 if a.max() > 255 else 255.0
+        a = a[..., :3].mean(2) if a.ndim == 3 else a
+        return np.asarray(Image.fromarray(a.astype(np.float32), mode="F").resize((size, size), Image.BICUBIC)).astype(np.float64)
+    return np.asarray(im.convert("RGB").resize((size, size), Image.LANCZOS)).astype(np.float64) / 255
+
+
+def gain_to(rgb, target_lin_mean):
+    lin = to_lin(rgb); k = target_lin_mean / max(float(luminance(lin).mean()), 1e-6)
+    return to_srgb(lin * k)
+
+
+def illum_reflect(rgb, p):
+    lin = luminance(to_lin(rgb)); w = lin.shape[1]
+    il = np.maximum(gblur(lin, p["illum_scale"] * w), 1e-4)
+    return lin, il, lin / il
+
+
+def match_lum_hist(rgb, ref_values):
+    # Luminance (linear) remapped by rank onto the reference values, chromaticity kept (same gain per pixel on the three channels).
+    lin = to_lin(rgb); Y = luminance(lin)
+    order = Y.ravel().argsort(); tgt = np.sort(ref_values)[np.linspace(0, ref_values.size - 1, Y.size).astype(int)]
+    newY = np.empty(Y.size); newY[order] = tgt
+    k = (newY.reshape(Y.shape) / np.maximum(Y, 1e-6))[..., None]
+    return to_srgb(lin * k)
+
+
+def methods(ref, height, ins, p):
+    lin_r, il_r, re_r = illum_reflect(ref, p)
+    lit = il_r > np.percentile(il_r, p["lit_pct"])
+    means = [float(luminance(to_lin(a)).mean()) for a in ins]
+    top = height > np.percentile(height, p["top_pct"])
+    return {
+        "M1 moyenne de la référence": lambda a: gain_to(a, float(lin_r.mean())),
+        "M2 consensus des variantes": lambda a: gain_to(a, float(np.mean(means))),
+        "M3 variante la mieux exposée": lambda a: gain_to(a, float(np.max(means))),
+        "M4 Retinex, lumière principale p90": lambda a: gain_to(a, float(re_r.mean() * np.percentile(il_r, p["key_pct"]))),
+        "M5 white patch, tons clairs p99": lambda a: to_srgb(to_lin(a) * (np.percentile(lin_r[lit], p["white_pct"]) / max(np.percentile(luminance(to_lin(a)), p["white_pct"]), 1e-6))),
+        "M6 histogramme de la zone la mieux éclairée": lambda a: match_lum_hist(a, lin_r[lit]),
+        "M7 sommets de la height (moins d'occlusion)": lambda a: gain_to(a, float((re_r * il_r.max())[top].mean() * float(lin_r[lit].mean() / (re_r * il_r.max())[lit].mean()))),
+        "M8 niveaux relatifs sur la zone éclairée": lambda a: (lambda Y, lin: to_srgb(lin * (((Y - np.percentile(Y, 2)) / max(np.percentile(Y, 98) - np.percentile(Y, 2), 1e-6) * (np.percentile(lin_r[lit], 98) - np.percentile(lin_r[lit], 2)) + np.percentile(lin_r[lit], 2)) / np.maximum(Y, 1e-6))[..., None]))(luminance(to_lin(a)), to_lin(a)),
+    }
+
+
+def contrast_kept(o, a):
+    Yo, Ya = luminance(to_lin(o)), luminance(to_lin(a))
+    Yo = Yo - Yo.mean(); Ya = Ya - Ya.mean()
+    return float((Yo * Ya).sum() / np.sqrt((Yo * Yo).sum() * (Ya * Ya).sum()))
+
+
+def main(out, ref_p, h_p, paths):
+    p = P; ref = load(ref_p, p["size"]); height = load(h_p, p["size"], grey=True)
+    ins = [load(q, p["size"]) for q in paths]; names = [q.split("/")[-1] for q in paths]
+    rep, rows = {}, []
+    for name, f in methods(ref, height, ins, p).items():
+        outs = [np.clip(f(a), 0, 1) for a in ins]
+        d = [describe(o) for o in outs]
+        rep[name] = {"means_srgb": [x["mean_srgb"] for x in d], "gap_between_generations": round(float(np.mean([gap(x, y) for x, y in itertools.combinations(outs, 2)])), 2),
+                     "outside_pbr_range": round(float(np.mean([x["outside_pbr_range"] for x in d])), 4), "contrast_kept": round(float(np.mean([contrast_kept(o, a) for o, a in zip(outs, ins)])), 4)}
+        rows.append((name, outs))
+        print(name, rep[name], flush=True)
+    rep["_reference"] = describe(ref)
+    c = 300
+    try:
+        font = ImageFont.truetype("/Users/zenray/Library/Fonts/GT-Ultra-Standard-Regular.otf", 15)
+    except OSError:
+        font = ImageFont.load_default()
+    sheet = Image.new("RGB", ((len(paths) + 1) * (c + 6), len(rows) * (c + 26)), (0, 0, 0))
+    for r, (name, outs) in enumerate(rows):
+        m = rep[name]
+        ImageDraw.Draw(sheet).text((6, r * (c + 26) + 5), f"{name}   moyennes {' / '.join(str(v) for v in m['means_srgb'])}   écart {m['gap_between_generations']}   hors PBR {m['outside_pbr_range']}   contraste {m['contrast_kept']}", fill=(255, 255, 255), font=font)
+        sheet.paste(Image.fromarray((ref * 255).astype(np.uint8)).resize((c, c)), (0, r * (c + 26) + 26))
+        for i, o in enumerate(outs):
+            sheet.paste(Image.fromarray((o * 255).astype(np.uint8)).resize((c, c)), ((i + 1) * (c + 6), r * (c + 26) + 26))
+    sheet.save(f"{out}/brightness_tournament_board.png")
+    json.dump(rep, open(f"{out}/brightness_tournament.json", "w"), indent=1, ensure_ascii=False)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4:])

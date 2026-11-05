@@ -1,0 +1,17 @@
+#!/bin/zsh
+# 4 November 2026, 21:29 : ZenRay Height chain on every Zorah final height, one after the other (one Houdini bridge) :
+# Reproduce FULL, then RunL6 (H2 -> H3), then RunPixelRounds from H3 (4 rounds). Texture 4 is already done (0.9906, same input).
+# FR : chaîne ZenRay Height sur chaque height finale de Zorah, en séquence. Usage : zsh RunAllHeights.sh
+F=/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Sources/artstation-eRZ01X/textures/final
+S=/Users/zenray/.claude/skills/zenray-houdini/scripts/height
+L6=/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Scripts/RunL6.py
+PY=/Users/zenray/.venvs/zenray-uv/bin/python
+for pair in 1:ZorahMaterials01 2:ZorahMaterials02 3:ZorahMaterials03 5:ZorahMaterials05 6:ZorahMaterials06V2; do
+  n=${pair%%:*}; name=${pair#*:}
+  echo "=== $(date '+%H:%M') $name start"
+  python3 $S/Reproduce.py --input $F/$n.png --name $name --level FULL --no-basecolor || { echo "=== $name Reproduce failed"; continue; }
+  python3 $L6 $name || echo "=== $name L6 failed"
+  python3 $S/RunPixelRounds.py $name H3 4 || echo "=== $name rounds failed"
+  echo "=== $(date '+%H:%M') $name done"
+done
+echo "=== ALL DONE $(date '+%H:%M')"

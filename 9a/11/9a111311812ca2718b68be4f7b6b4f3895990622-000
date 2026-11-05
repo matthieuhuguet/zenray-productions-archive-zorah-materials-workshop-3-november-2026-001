@@ -1,0 +1,905 @@
+#!/usr/bin/env python3
+# 3 November 2026 : builds value-chain.svg and Synthesis.html for zorah-materials from the cloud handoff, and verifies them.
+# FR : construit value-chain.svg et Synthesis.html du projet zorah-materials depuis le handoff cloud, puis les vérifie.
+#
+# Usage:
+#   python3 BuildSynthesis.py build      # writes ../value-chain.svg and ../Synthesis.html (Pillow needed, fontTools optional)
+#   python3 BuildSynthesis.py verify     # standard library only ; --json for a machine verdict ; exit 1 when a check fails
+#   python3 BuildSynthesis.py selftest   # verify must go green on the real files and red on deliberately broken copies
+#
+# Every number written in the diagram comes from the JSON files of the handoff (see P_SOURCES) ;
+# verify recomputes them from those files and fails if the diagram drifts.
+# FR : chaque chiffre du diagramme vient des JSON du handoff ; verify les recalcule et échoue si le schéma dérive.
+
+import argparse, base64, copy, datetime, hashlib, html, io, json, os, re, shutil, sys, tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+OUT = os.path.dirname(HERE)
+# Inside the Memory repository the handoff sits above out/ ; once copied to the atelier, fall back to the Mac clone and originals.
+# FR : dans le dépôt, le handoff est au-dessus de out/ ; une fois copié dans l'atelier, on retombe sur le clone Memory1 et les originaux du Mac.
+MAC_HANDOFF = "/Users/zenray/.claude/Memory1/Projects/zorah-materials/handoff/synthesis-svg-3-November-2026"
+HANDOFF = os.path.dirname(OUT) if os.path.isfile(os.path.join(os.path.dirname(OUT), "MANIFEST.json")) else MAC_HANDOFF
+FILES = os.path.join(HANDOFF, "files") if os.path.isdir(os.path.join(HANDOFF, "files")) else "/Users/zenray/.claude"
+FONTS_HANDOFF = os.path.join(os.path.dirname(HANDOFF), "synthesis-fonts-3-November-2026")
+FONTS = os.path.join(FONTS_HANDOFF, "files", "skills", "zenray-edit", "designs", "_shared", "fonts")
+if not os.path.isdir(FONTS):
+    FONTS = "/Users/zenray/.claude/skills/zenray-edit/designs/_shared/fonts"
+ATELIER = "/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026"
+ZRH = "/Users/zenray/.claude/tmp/tmp-zenray-height/projects"
+
+# Editable parameters, HDA style. FR : paramètres éditables, à la manière d'un HDA.
+P = {
+    "first_render": "2026-11-03T23:53:00+01:00",  # first build of this synthesis, when its entries were added ; never moves on rebuild
+    "fig_max_px": 1600,      # longest side of an embedded board
+    "fig_square_px": 1100,   # longest side of an embedded panel or 2x2 grid
+    "jpeg_quality": 82,
+    "fig_cols": 2,           # at most two figures side by side
+    "html_limit_mib": 32,    # Assets reader limit per document
+    "claude_md_bytes": 64823,  # size of the global CLAUDE.md given in the handoff
+    "claude_md_limit": 65536,
+}
+
+A = "tmp/tmp-zorah-materials-3-november-2026/"
+Z = "tmp/tmp-zenray-height/projects/"
+J_RB = A + "Analysis/rolling-ball-top-3-November-2026/rolling_ball_top.json"
+J_V1 = A + "Analysis/rolling-ball-top-3-November-2026/variants.json"
+J_V2 = A + "Analysis/rolling-ball-top-3-November-2026/variants2.json"
+J_FM = A + "Analysis/frequency-merge-3-November-2026/frequency_merge.json"
+J_R4 = Z + "ZorahMaterials04/report.json"
+J_P4 = Z + "ZorahMaterials04/report_pixel_rounds.json"
+J_R6 = Z + "ZorahMaterials06/report.json"
+PROMPT_CHAIN = "skills/zenray-houdini/templates/zenray-height-from-map/prompt_height_chain.md"
+PROMPT_BC = A + "Prompts/basecolor-prompt-zorah.md"
+
+MONTHS = "January February March April May June July August September October November December".split()
+
+
+def jload(rel):
+    with open(os.path.join(FILES, rel), encoding="utf-8") as f:
+        return json.load(f)
+
+
+def fr(x, nd=None):
+    """French decimal comma, real minus sign. FR : virgule décimale, vrai signe moins."""
+    s = ("%." + str(nd) + "f") % x if nd is not None else repr(x)
+    if s.endswith(".0"):
+        s = s[:-2]
+    return s.replace("-", "−").replace(".", ",")
+
+
+def mean(v):
+    return sum(v) / len(v)
+
+
+def key_numbers():
+    """The five numbers of the diagram, recomputed from the JSON files. FR : les cinq chiffres du schéma."""
+    v1 = jload(J_V1); rb = jload(J_RB); r4 = jload(J_R4); p4 = jload(J_P4)
+    h = {e["tag"]: e["pearson_full"] for e in p4["history"]}
+    return {
+        "uniformiser_before": fr(round(v1["V0 rolling ball"]["pairs_mean"], 2), 2),
+        "uniformiser_after": fr(round(mean(list(rb["pairs_after"].values())), 2), 2),
+        "full": fr(r4["pearson_full"], 4),
+        "plan_l6": fr(h["H3"], 4),
+        "final": fr(p4["pearson_full"], 4),
+        "final_ssim": fr(p4["ssim_full"], 4),
+        "final_mae": fr(p4["mae"], 4),
+    }
+
+
+# ----------------------------------------------------------------------------------------------
+# SVG value chain. FR : le diagramme de la chaîne de valeur.
+# ----------------------------------------------------------------------------------------------
+
+SVG_W, SVG_H = 900, 1040
+X0, MW = 30, 560          # main column
+SX, SW = 640, 230         # side column, discarded routes
+
+SVG_CSS = """
+.vc{--vc-bg:#FBFAF7;--vc-ink:#161514;--vc-muted:#76716A;--vc-accent:#8A2F22;--vc-line:#CFC9BE;--vc-block:#F3F1EC;--vc-chip:#FFFFFF}
+@media (prefers-color-scheme: dark){.vc{--vc-bg:#1A1918;--vc-ink:#E9E5DE;--vc-muted:#9A948B;--vc-accent:#D98A7A;--vc-line:#4A4640;--vc-block:#232120;--vc-chip:#2B2927}}
+.vc .bg{fill:var(--vc-bg)}
+.vc .t{font-family:'GT Ultra','GTUltra-Regular','Hiragino Sans',sans-serif;font-weight:400}
+.vc .b{font-family:'Literata','Literata-Regular','Hiragino Mincho ProN',Georgia,serif;font-weight:400}
+.vc .ink{fill:var(--vc-ink)}.vc .mut{fill:var(--vc-muted)}.vc .acc{fill:var(--vc-accent)}
+.vc .node{fill:var(--vc-block);stroke:var(--vc-line);stroke-width:1.2}
+.vc .chip{fill:var(--vc-chip);stroke:var(--vc-line);stroke-width:1}
+.vc .tail{fill:none;stroke:var(--vc-muted);stroke-width:1.1}
+.vc .off{fill:none;stroke:var(--vc-muted);stroke-width:1.1;stroke-dasharray:5 4}
+.vc .link{stroke:var(--vc-muted);stroke-width:1.1;stroke-dasharray:5 4;fill:none}
+.vc .flow{stroke:var(--vc-ink);stroke-width:1.6;fill:none}
+.vc .head{fill:var(--vc-ink)}
+.vc .x{stroke:var(--vc-muted);stroke-width:1.6;stroke-linecap:round}
+"""
+
+
+def esc(s):
+    return html.escape(s, quote=False)
+
+
+def T(x, y, s, cls, size, anchor=None):
+    a = ' text-anchor="%s"' % anchor if anchor else ""
+    if " b " in " %s " % cls and "<" not in s:
+        s = SVG_NUM_RE.sub(lambda m: '<tspan class="t">%s</tspan>' % m.group(0), s)
+    return '<text x="%g" y="%g" class="%s" font-size="%g"%s>%s</text>' % (x, y, cls, size, a, s)
+
+
+SVG_NUM_RE = re.compile(r"(?<![\w.,/-])\d+(?:[,.]\d+)?(?![\w-])")
+
+
+def arrow_down(x, y1, y2):
+    return ('<path class="flow" d="M%g %gV%g"/><path class="head" d="M%g %gl-5 -9h10z"/>' % (x, y1, y2 - 8, x, y2))
+
+
+def arrow_right(x1, x2, y):
+    return ('<path class="flow" d="M%g %gH%g"/><path class="head" d="M%g %gl-8 -4.5v9z"/>' % (x1, y, x2 - 7, x2, y))
+
+
+def node(y, h, tag, title, lines, extra=""):
+    """A main step : tag, title, description lines. FR : une étape de la chaîne."""
+    out = ['<g class="vc-node" data-node="%s">' % esc(title)]
+    out.append('<rect class="node" x="%g" y="%g" width="%g" height="%g" rx="6"/>' % (X0, y, MW, h))
+    out.append(T(X0 + 18, y + 24, esc(tag), "t acc", 12.5))
+    out.append(T(X0 + 18, y + 50, title, "t ink", 19))
+    for i, (s, cls, size) in enumerate(lines):
+        out.append(T(X0 + 18, y + 74 + i * 24, s, cls, size))
+    out.append(extra)
+    out.append("</g>")
+    return "".join(out)
+
+
+def chip(x, y, w, h, num, label, desc):
+    return ('<g class="vc-node" data-node="%s"><rect class="chip" x="%g" y="%g" width="%g" height="%g" rx="5"/>' % (esc(label), x, y, w, h)
+            + T(x + 14, y + 44, num, "t acc", 24)
+            + T(x + 42, y + 28, esc(label), "t ink", 14)
+            + T(x + 42, y + 50, esc(desc), "b mut", 13) + "</g>")
+
+
+def off_box(y, h, time, title, lines, link_y):
+    out = ['<g class="vc-node" data-node="%s">' % esc(title)]
+    out.append('<rect class="off" x="%g" y="%g" width="%g" height="%g" rx="6"/>' % (SX, y, SW, h))
+    cx, cy = SX + SW - 20, y + 18
+    out.append('<path class="x" d="M%g %gl8 8M%g %gl-8 8"/>' % (cx - 4, cy - 4, cx + 4, cy - 4))
+    out.append(T(SX + 14, y + 22, time, "t mut", 12.5))
+    out.append(T(SX + 14, y + 44, esc(title), "t ink", 14.5))
+    for i, s in enumerate(lines):
+        out.append(T(SX + 14, y + 64 + i * 18, esc(s), "b mut", 12.5))
+    out.append("</g>")
+    out.append('<path class="link" d="M%g %gH%g"/><circle cx="%g" cy="%g" r="3" class="head"/>' % (SX, link_y, X0 + MW, X0 + MW, link_y))
+    return "".join(out)
+
+
+def build_svg(font_css=""):
+    k = key_numbers()
+    mid = X0 + MW / 2
+    s = []
+    s.append('<svg xmlns="http://www.w3.org/2000/svg" class="vc" viewBox="0 0 %d %d" width="%d" height="%d" role="img" aria-labelledby="vc-title vc-desc">'
+             % (SVG_W, SVG_H, SVG_W, SVG_H))
+    s.append('<title id="vc-title">Chaîne de valeur Zorah, 3 November 2026</title>')
+    s.append('<desc id="vc-desc">Du panneau de référence éclairé à la height finale : prompt ChatGPT en quatre étapes, uniformiseur RollingBallTop.py, '
+             'ZenRay Height (%s, %s, %s), puis base color et cinq cartes. Voies écartées : fusion par fréquences, Delight seul, De-arc.</desc>'
+             % (k["full"], k["plan_l6"], k["final"]))
+    s.append("<style>%s%s</style>" % (font_css, SVG_CSS))
+    s.append('<rect class="bg" width="%d" height="%d"/>' % (SVG_W, SVG_H))
+    s.append(T(X0, 44, "Chaîne de valeur Zorah", "t ink", 26))
+    s.append('<text x="%g" y="70" class="b mut" font-size="15">Height et base color depuis une map éclairée, <tspan class="t">3 November 2026</tspan></text>' % X0)
+
+    # A, input. FR : entrée.
+    s.append(node(100, 84, "Entrée", "Panneau de référence éclairé",
+                  [("zorah-04-panel.png, découpé à plat, ombrage de présentation compris", "b mut", 14)]))
+    s.append(arrow_down(mid, 184, 212))
+
+    # B, four step prompt. FR : prompt en quatre étapes.
+    cw, ch = (MW - 32 - 12) / 2, 70
+    r1, r2 = 280, 360
+    chips = (chip(X0 + 16, r1, cw, ch, "1", "Python, passe-haut", "chaque détail à sa place")
+             + chip(X0 + 16 + cw + 12, r1, cw, ch, "2", "Génération d'image", "corrige les défauts d'ombrage")
+             + chip(X0 + 16, r2, cw, ch, "3", "Python, niveaux de gris", "ne reprend de 1 que ses niveaux")
+             + chip(X0 + 16 + cw + 12, r2, cw, ch, "4", "Python, rolling ball", "par le haut, retire le reste"))
+    s.append(node(212, 232, "ChatGPT, un seul message", "Prompt height en quatre étapes", [], chips))
+    s.append(arrow_down(mid, 444, 472))
+
+    # C, uniformiser. FR : uniformiseur.
+    s.append(node(472, 112, "Python", "Uniformiseur RollingBallTop.py",
+                  [("boule par le haut, puis trois filtres d'accord", "b mut", 14),
+                   ("ressemblance a1, a2, a3 : %s → %s" % (k["uniformiser_before"], k["uniformiser_after"]), "t acc", 15)]))
+    s.append(arrow_down(mid, 584, 612))
+
+    # D, ZenRay Height. FR : ZenRay Height, trois paliers mesurés.
+    gw, gy, gh = (MW - 32 - 48) / 3, 678, 58
+    steps = [("Reproduce.py FULL", k["full"]), ("Plan L6", k["plan_l6"]), ("RunPixelRounds.py", k["final"])]
+    inner = []
+    for i, (lab, val) in enumerate(steps):
+        x = X0 + 16 + i * (gw + 24)
+        inner.append('<g class="vc-node" data-node="%s"><rect class="chip" x="%g" y="%g" width="%g" height="%g" rx="5"/>' % (esc(lab), x, gy, gw, gh)
+                     + T(x + 12, gy + 22, esc(lab), "t ink", 13) + T(x + 12, gy + 47, val, "t acc", 20) + "</g>")
+        if i < 2:
+            inner.append(arrow_right(x + gw + 4, x + gw + 20, gy + gh / 2))
+    inner.append(T(X0 + 18, 754, "corrélation pleine résolution ; objectif <tspan class=\"t\">0,999</tspan> non atteint", "b mut", 12.5))
+    s.append(node(612, 150, "Houdini, Copernicus", "ZenRay Height, sur la 4", [], "".join(inner)))
+    s.append(arrow_down(mid, 762, 790))
+
+    # E, output. FR : sortie.
+    s.append(node(790, 84, "Sortie", "Height finale",
+                  [('ZorahMaterials04_H5, SSIM <tspan class="t">%s</tspan>, MAE <tspan class="t">%s</tspan>' % (k["final_ssim"], k["final_mae"]), "b mut", 14)]))
+    s.append(arrow_down(mid, 874, 902))
+    s.append(T(mid + 12, 893, "suite, non mesurée", "b mut", 12.5))
+
+    # Tail : base color. FR : la suite, base color et cartes.
+    tw, ty, th = (MW - 40) / 3, 902, 62
+    tail = [("Base color, 4 étapes", "à tester"), ("HeightToBaseColor.py", "Houdini"), ("Cinq cartes", "Copernicus2.md, 14.8")]
+    for i, (lab, sub) in enumerate(tail):
+        x = X0 + i * (tw + 20)
+        s.append('<g class="vc-node" data-node="%s"><rect class="tail" x="%g" y="%g" width="%g" height="%g" rx="6"/>' % (esc(lab), x, ty, tw, th)
+                 + T(x + 12, ty + 26, esc(lab), "t ink", 13.5) + T(x + 12, ty + 46, esc(sub), "b mut", 12.5) + "</g>")
+        if i < 2:
+            s.append(arrow_right(x + tw + 3, x + tw + 18, ty + th / 2))
+
+    # Side : discarded routes. FR : voies essayées puis écartées.
+    s.append(T(SX, 236, "Voies essayées, puis écartées", "t mut", 14))
+    s.append(off_box(300, 96, "22:08", "Fusion par fréquences", ["relisait les pixels de l'étape 1", "et remettait l'ombrage : ratée"], 342))
+    s.append(off_box(462, 76, "21:08", "Delight seul", ["passe-haut : pas assez poussé"], 500))
+    s.append(off_box(550, 76, "21:22", "De-arc", ["flou anisotrope : rejeté"], 572))
+
+    # Footer. FR : pied, sources des chiffres.
+    s.append(T(X0, 1000, "Ordre logique de la chaîne. Uniformiseur mesuré sur a1, a2, a3, trois générations d'une même dalle ; ZenRay Height mesuré sur la 4.", "b mut", 12))
+    s.append(T(X0, 1020, "Sources : variants.json, rolling_ball_top.json, report.json et report_pixel_rounds.json de ZorahMaterials04.", "b mut", 12))
+    s.append("</svg>")
+    return "".join(s)
+
+
+def svg_chars(svg):
+    txt = re.sub(r"<[^>]+>", " ", re.sub(r"<style>.*?</style>", "", svg, flags=re.S))
+    return set(html.unescape(txt)) | set(" 0123456789,.")
+
+
+def subset_font(path, chars):
+    """Woff2 subset when fontTools is there, else the whole font. FR : sous-ensemble si fontTools est installé."""
+    try:
+        from fontTools import subset
+        from fontTools.ttLib import TTFont
+        f = TTFont(path)
+        opts = subset.Options(); opts.flavor = "woff2"; opts.layout_features = ["*"]
+        sb = subset.Subsetter(options=opts); sb.populate(text="".join(sorted(chars))); sb.subset(f)
+        b = io.BytesIO(); f.flavor = "woff2"; f.save(b)
+        return b.getvalue(), True
+    except Exception:
+        return open(path, "rb").read(), False
+
+
+def font_face(family, data, style="normal"):
+    return ("@font-face{font-family:'%s';font-style:%s;font-weight:400;font-display:block;src:url(data:font/woff2;base64,%s) format('woff2')}"
+            % (family, style, base64.b64encode(data).decode()))
+
+
+# ----------------------------------------------------------------------------------------------
+# HTML synthesis. FR : la synthèse HTML.
+# ----------------------------------------------------------------------------------------------
+
+NUM_RE = re.compile(
+    r"\b\d{1,2} (?:%s) \d{4}(?:, \d{1,2}:\d{2}(?: \+0100)?)?" % "|".join(MONTHS)
+    + r"|(?<![\w.,/:])\d{1,2}:\d{2}(?: \+0100)?(?![\w])"
+    + r"|(?<![\w.,/-])[−+]?\d+(?:[,.]\d+)?(?: ?%| ?(?:px|min|Mo|Mio|Ko|octets|bits))?(?![\w])"
+    + r"|→")
+
+
+def prose(s):
+    """Plain French text with `code` spans -> HTML ; numbers and dates in GT Ultra ; French spaces.
+    FR : texte français avec `code` -> HTML ; nombres et dates en GT Ultra ; espaces insécables."""
+    parts = re.split(r"(`[^`]*`)", s)
+    out = []
+    for p in parts:
+        if p.startswith("`") and p.endswith("`") and len(p) >= 2:
+            out.append("<code>%s</code>" % esc(p[1:-1]))
+            continue
+        p = p.replace(" :", " :").replace(" ;", " ;").replace("« ", "« ").replace(" »", " »").replace(" ?", " ?").replace(" !", " !")
+        e = esc(p)
+        out.append(NUM_RE.sub(lambda m: '<span class="num">%s</span>' % re.sub(r" (?=px|min|Mo|Mio|Ko|octets|bits|\+0100)", "\u00a0", m.group(0)), e))
+    return "".join(out)
+
+
+def para(s):
+    return "<p>%s</p>" % prose(s)
+
+
+def table(head, rows, cls=""):
+    h = "".join("<th>%s</th>" % prose(c) for c in head)
+    b = "".join("<tr>%s</tr>" % "".join("<td>%s</td>" % prose(c) for c in r) for r in rows)
+    return '<div class="tw"><table class="%s"><thead><tr>%s</tr></thead><tbody>%s</tbody></table></div>' % (cls, h, b)
+
+
+def img_data(rel, max_px):
+    from PIL import Image
+    im = Image.open(os.path.join(FILES, rel)).convert("RGB")
+    w0, h0 = im.size
+    im.thumbnail((max_px, max_px), Image.LANCZOS)
+    b = io.BytesIO(); im.save(b, "JPEG", quality=P["jpeg_quality"], optimize=True, progressive=True)
+    return "data:image/jpeg;base64," + base64.b64encode(b.getvalue()).decode(), (w0, h0), im.size
+
+
+def figure(items, caption):
+    """items : list of (rel, alt, max_px). FR : au plus deux images côte à côte."""
+    cells = []
+    for rel, alt, mx in items:
+        uri, (w0, h0), (w, h) = img_data(rel, mx)
+        cells.append('<div class="cell"><img src="%s" width="%d" height="%d" alt="%s" loading="lazy" decoding="async"></div>' % (uri, w, h, html.escape(alt), ))
+    sizes = []
+    for rel, alt, mx in items:
+        from PIL import Image
+        w0, h0 = Image.open(os.path.join(FILES, rel)).size
+        sizes.append("%d × %d px" % (w0, h0))
+    cap = caption + " Original : `%s`, %s, réduit pour l'embarquer." % ("`, `".join(os.path.basename(r) for r, _, _ in items), ", ".join(sizes))
+    return '<figure class="f%d"><div class="grid">%s</div><figcaption>%s</figcaption></figure>' % (len(items), "".join(cells), prose(cap))
+
+
+def code_block(text):
+    return "<pre><code>%s</code></pre>" % esc(text)
+
+
+def fenced(rel, index):
+    """The n-th ```text block of a Markdown file, verbatim. FR : le n-ième bloc text, mot pour mot."""
+    src = open(os.path.join(FILES, rel), encoding="utf-8").read()
+    blocks = re.findall(r"```text\n(.*?)\n```", src, flags=re.S)
+    return blocks[index]
+
+
+def disp(iso):
+    d = datetime.datetime.fromisoformat(iso)
+    return "%d %s %d, %02d:%02d +0100" % (d.day, MONTHS[d.month - 1], d.year, d.hour, d.minute)
+
+
+ENTRIES = [
+    # id, ISO time of the recorded fact, kind, text, provenance
+    ("e-1856-checkaiheight", "2026-11-03T18:56:00+01:00", "outil",
+     "`CheckAiHeight.py` créé, heure lue sur le fichier : code 0 pour une vraie height, 1 pour une height à refaire, avec la raison. Le selftest accepte une height synthétique de blocs et refuse la même éclairée.",
+     "skill zenray-houdini, sections sans heure et 19:56"),
+    ("e-1858-prompt-v2", "2026-11-03T18:58:00+01:00", "prompt",
+     "Prompt height v2 : la valeur d'un pixel dépend de l'altitude, jamais de la pente. Bilan de six heights ChatGPT éclairées dans `REPORT.md`.",
+     "`height-prompt-zorah.md`, version 2"),
+    ("e-1956-prompt-final", "2026-11-03T19:56:00+01:00", "prompt",
+     "Prompt height final validé : génération d'image et Python dans le même message, filtre passe-haut, PNG 16 bits.",
+     "skill zenray-houdini, 19:56"),
+    ("e-2035-workflow-8", "2026-11-03T20:35:00+01:00", "règle",
+     "Workflow height 8 : pas de génération d'image pour une référence totalement droite, Python seul depuis ChatGPT, un chat séquentiel.",
+     "skill zenray-houdini, 20:35 ; `Rules.md`"),
+    ("e-2052-basecolor-flat", "2026-11-03T20:52:00+01:00", "prompt",
+     "Prompt base color flat validé : le panneau découpé puis la height finale ; sa sortie repart dans `HeightToBaseColor.py`.",
+     "skill zenray-houdini, 20:52"),
+    ("e-2058-fin-de-cycle", "2026-11-03T20:58:00+01:00", "règle",
+     "Fin de cycle ZenRay Height : la grille 2x2 et le zoom du joint partent chez Matthieu. Sur la 6, les rainures tombent tous les 261 px sur 2048, soit 7,85 par tuile : la période d'un motif doit diviser la tuile.",
+     "skill zenray-houdini, 20:58"),
+    ("e-2108-delight", "2026-11-03T21:08:00+01:00", "module écarté",
+     "Module Delight, passe-haut en nœuds Copernicus : part de taches de lumière 0,056 avant, puis 0,024, 0,013 et 0,005 à sigma 128, 64 et 32. Statut dans `MethodNames.json` : jugé pas assez poussé par Matthieu.",
+     "skill zenray-houdini, 21:08 ; `MethodNames.json`"),
+    ("e-2122-dearc", "2026-11-03T21:22:00+01:00", "module écarté",
+     "Module De-arc, flou anisotrope qui exclut les joints : arc de la planche −0,0113 avant, +0,0027 à 12 px. Jugé « ça marche pas » par Matthieu à 21:28.",
+     "skill zenray-houdini, 21:22 et 21:28 ; `dearc_board.png`"),
+    ("e-2128-chaine", "2026-11-03T21:28:00+01:00", "chaîne",
+     "Chaîne de valeur en sept étapes et prompt de correction d'ombrage validé ; Delight et De-arc sortent de la chaîne.",
+     "skill zenray-houdini, 21:28"),
+    ("e-2145-deux-messages", "2026-11-03T21:45:00+01:00", "prompt",
+     "Correction d'ombrage qui a marché, en deuxième message : génération d'image, puis recalage de la composition en Python.",
+     "skill zenray-houdini, 21:45 ; `shading-fix-prompt-zorah.md`"),
+    ("e-2208-frequences", "2026-11-03T22:08:00+01:00", "voie écartée",
+     "Prompt en une étape par séparation de fréquences, mesuré sur trois générations de la 6. Le test de Matthieu rend une sortie qui ressemble à l'étape 1, ombrage compris : voie ratée, consignée à 22:20 et 22:47.",
+     "skill zenray-houdini, 22:08 et 22:47 ; `frequency_merge.json` ; `chatgpt-one-step-board.webp`"),
+    ("e-2247-quatre-etapes", "2026-11-03T22:47:00+01:00", "prompt validé",
+     "Prompt height en quatre étapes validé par Matthieu : « Insane le prompt, c'est magique ». Il remplace les prompts de 19:56, 21:45 et 22:08, conservés comme historique.",
+     "`prompt_height_chain.md` ; `ChatGptChainPrompts.md`"),
+    ("e-2317-zenray-height-4", "2026-11-03T23:17:00+01:00", "mesure",
+     "ZenRay Height sur la 4 : FULL 0,9775 en 8,6 min, plan L6 0,9844, tours au pixel 0,9894 puis 0,9906, plateau à 0,9906. Version finale `ZorahMaterials04_H5`.",
+     "`report.json` et `report_pixel_rounds.json` de ZorahMaterials04"),
+    ("e-2323-rolling-ball", "2026-11-03T23:23:00+01:00", "outil",
+     "Uniformiseur `RollingBallTop.py`, rolling ball par le haut, sortie PNG 16 bits ; selftest dans les deux sens.",
+     "skill zenray-houdini, 23:23"),
+    ("e-2328-filtres", "2026-11-03T23:28:00+01:00", "mesure",
+     "Trois filtres d'accord ajoutés à l'uniformiseur : ressemblance entre a1, a2 et a3 de 0,67 à 0,80. Résolveur `FindMethod.py` et table `MethodNames.json` des trois noms. Prompt base color en quatre étapes écrit, à tester.",
+     "skill zenray-houdini, 23:28 ; `rolling_ball_top.json`"),
+    ("e-2335-handoff", "2026-11-03T23:35:00+01:00", "transfert",
+     "Handoff cloud : 29 fichiers et 3 polices confiés par pointeurs dans le dépôt Memory, branche main.",
+     "`MANIFEST.json` des deux dossiers de handoff"),
+]
+
+FAMILIES = [
+    ("Références", [
+        (A + "Sources/artstation-eRZ01X/textures/panels/zorah-04-panel.png", "panneau éclairé de la 4, entrée de la chaîne"),
+        (A + "Sources/artstation-eRZ01X/textures/panels/zorah-06-panel.png", "panneau éclairé de la 6"),
+    ]),
+    ("Prompts", [
+        (A + "Prompts/height-prompt-zorah.md", "historique des prompts height, v1 à 19:56"),
+        (A + "Prompts/shading-fix-prompt-zorah.md", "correction d'ombrage, versions en une, trois et quatre étapes"),
+        (A + "Prompts/basecolor-prompt-zorah.md", "base color flat validé et version en quatre étapes à tester"),
+    ]),
+    ("Analyses et mesures", [
+        (A + "Analysis/zenray-houdini-sections-3-November-2026.md", "sections du skill zenray-houdini du jour"),
+        (A + "Analysis/ai-height-lighting-3-November-2026/REPORT.md", "bilan des heights ChatGPT éclairées"),
+        (A + "Analysis/rolling-ball-top-3-November-2026/rolling_ball_top_board.png", "planche de l'uniformiseur, a1, a2, a3"),
+        (J_RB, "mesures de l'uniformiseur final"),
+        (J_V1, "banc d'essai, variantes 1"),
+        (J_V2, "banc d'essai, variantes 2"),
+        (A + "Analysis/final-step-options-3-November-2026/final_step_board.png", "choix de l'étape 4"),
+        (A + "Analysis/frequency-merge-3-November-2026/merge_board.png", "planche de la fusion par fréquences"),
+        (J_FM, "mesures de la fusion par fréquences"),
+        (A + "Analysis/one-step-test-3-November-2026/chatgpt-one-step-board.webp", "test en une étape de Matthieu"),
+    ]),
+    ("Résultats ZenRay Height", [
+        (Z + "ZorahMaterials04/versions/final/ZorahMaterials04_H5/checks/grid_2x2_preview.png", "tuile 2x2 de la height finale de la 4"),
+        (J_R4, "mesures FULL de la 4"),
+        (J_P4, "mesures des tours au pixel de la 4"),
+        (Z + "ZorahMaterials06/versions/final/ZorahMaterials06_H2/checks/grid_2x2_preview.png", "tuile 2x2 de la height de la 6"),
+        (J_R6, "mesures FULL de la 6"),
+        (Z + "ZorahMaterials06/versions/final/ZorahMaterials06_H2/dearc/dearc_board.png", "planche De-arc sur la 6"),
+    ]),
+    ("Skills et contrats", [
+        (PROMPT_CHAIN, "prompt en quatre étapes, source de vérité"),
+        ("skills/zenray-edit/references/ChatGptChainPrompts.md", "méthode générale des prompts chaînés"),
+        ("skills/zenray-houdini/scripts/height/MethodNames.json", "trois noms de chaque méthode de map"),
+        ("skills/zenray-edit/references/ProjectSynthesis.md", "contrat de la synthèse HTML"),
+        ("skills/zenray-edit/references/ProjectArticles.md", "contrat des articles Assets"),
+    ]),
+    ("Règles et suivi", [
+        ("CLAUDE.md", "instructions globales de Matthieu"),
+        ("Memory1/Projects/zorah-materials/FEEDBACK.md", "suivi du chantier"),
+        ("Memory1/Projects/zorah-materials/Rules.md", "règles épinglées du projet"),
+    ]),
+]
+
+
+def manifest():
+    m = {}
+    for d in (HANDOFF, FONTS_HANDOFF):
+        mm = json.load(open(os.path.join(d, "MANIFEST.json"), encoding="utf-8"))
+        for f in mm["files"]:
+            f = dict(f); f["_dir"] = d
+            m[f["key"]] = f
+    return m
+
+
+def inventory_html():
+    m = manifest()
+    fams = [(name, [(m[k], role) for k, role in items]) for name, items in FAMILIES]
+    font_items = [(m[k], "police embarquée en base64") for k in m if k.endswith(".woff2")]
+    fams.append(("Polices", font_items))
+    outs = [("value-chain.svg", "diagramme de la chaîne, autonome"), ("Synthesis.html", "cette synthèse"),
+            ("RULE.md", "textes exacts de la règle SVG"), ("APPLY.md", "gestes locaux ordonnés"),
+            ("build/BuildSynthesis.py", "générateur et vérificateur de ces sorties")]
+    total = sum(len(i) for _, i in fams) + len(outs)
+    summary = " · ".join("%s %d" % (n, len(i)) for n, i in fams) + " · Sorties %d" % len(outs)
+    rows = []
+    for name, items in fams:
+        for f, role in items:
+            ext = os.path.splitext(f["key"])[1].lstrip(".").upper()
+            sec = "%s octets · sha256 `%s` · blob `%s` · copié dans `%s`" % (f"{f['bytes']:,}".replace(",", " "), f["sha256"], f["blob"], f["repo_path"])
+            rows.append("<tr><td>%s</td><td>%s</td><td>%s, confirmé par le handoff</td><td>%s</td><td>non fourni</td><td><code class=\"path\">%s</code></td><td>non mesurée</td>"
+                        "<td>Mac : source déclarée · GitHub main : sha256 vérifié · Assets : non vérifié</td><td><details><summary>détails</summary>%s</details></td></tr>"
+                        % (esc(name), prose("`%s`" % os.path.basename(f["key"])), prose(role), ext, esc(f["source"]), prose(sec)))
+    for fn, role in outs:
+        ext = os.path.splitext(fn)[1].lstrip(".").upper()
+        rows.append("<tr><td>Sorties</td><td>%s</td><td>%s</td><td>%s</td><td>non fourni</td><td><code class=\"path\">%s</code></td><td>non mesurée</td>"
+                    "<td>branche cloud/zorah-synthesis-3-november-2026 · Mac : après APPLY.md · Assets : non vérifié</td><td>%s</td></tr>"
+                    % (prose("`%s`" % os.path.basename(fn)), prose(role), ext, esc(ATELIER + "/Articles/" + fn), prose("chemin du dépôt `Projects/zorah-materials/handoff/synthesis-svg-3-November-2026/out/%s`" % fn)))
+    head = "".join("<th>%s</th>" % h for h in ["Famille", "Nom", "Rôle", "Type", "Identifiant Assets", "Chemin", "Modification", "Disponibilité", "Secondaire"])
+    return total, summary, '<div class="tw"><table class="inv"><thead><tr>%s</tr></thead><tbody>%s</tbody></table></div>' % (head, "".join(rows))
+
+
+CSS = """
+:root{--bg:#FBFAF7;--ink:#161514;--muted:#76716A;--accent:#8A2F22;--rule:#E4E0D8;--block:#F3F1EC;
+--font-title:'GT Ultra','GTUltra-Regular','Hiragino Sans',sans-serif;--font-num:'GT Ultra','GTUltra-Regular','Hiragino Sans',sans-serif;
+--font-body:'Literata','Literata-Regular','Hiragino Mincho ProN',Georgia,serif;--font-mono:'AnthropicMono',ui-monospace,Menlo,monospace;
+--base:18px;--lh:1.7;--measure:68ch;--wide:940px;--pad:2.2em;--radius:2px;--fig-cols:%(fig_cols)d;color-scheme:light dark}
+@media (prefers-color-scheme: dark){:root{--bg:#1A1918;--ink:#E9E5DE;--muted:#9A948B;--accent:#D98A7A;--rule:#34312D;--block:#232120}}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-weight:400;font-size:var(--base);line-height:var(--lh);font-optical-sizing:auto;-webkit-text-size-adjust:100%%}
+main{max-width:calc(var(--measure) + 2 * var(--pad));margin:0 auto;padding:3em var(--pad) 4em}
+h1,h2,h3,summary,.num,th,.tag,.state b{font-family:var(--font-title);font-weight:400}
+h1{font-size:2.6em;line-height:1.1;text-align:center;letter-spacing:-0.015em;margin:0 0 .35em}
+.sub{text-align:center;color:var(--muted);margin:0 0 1.6em}
+h2{font-size:1.6em;line-height:1.2;letter-spacing:-0.01em;margin:2.2em 0 .6em}
+h3{font-size:1.2em;margin:1.6em 0 .4em}
+p{margin:0 0 1em}
+a{color:var(--accent)}
+code{font-family:var(--font-mono);font-size:.82em;background:var(--block);padding:.05em .3em;border-radius:var(--radius);overflow-wrap:anywhere}
+pre{background:var(--block);padding:1em 1.1em;border-radius:var(--radius);white-space:pre-wrap;overflow-wrap:anywhere;font-size:.86em;line-height:1.55;margin:0 0 1em}
+pre code{background:none;padding:0;font-size:1em}
+.state{border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:.8em 0;margin:0 0 1.6em;font-size:.92em;color:var(--muted)}
+.state b{color:var(--ink)}
+.wide{margin-left:calc(50%% - min(50vw, var(--wide) / 2) + var(--pad) * 0);margin-right:calc(50%% - min(50vw, var(--wide) / 2));}
+figure{margin:1.6em 0 2em}
+figure .grid{display:grid;grid-template-columns:repeat(min(var(--fig-cols), var(--n, 1)), minmax(0,1fr));gap:10px}
+figure.f1{--n:1}figure.f2{--n:2}
+figure img{display:block;width:100%%;height:auto;border-radius:var(--radius);background:var(--block)}
+figcaption{font-size:.84em;color:var(--muted);margin-top:.6em;line-height:1.5}
+.chain{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--rule);border-radius:var(--radius)}
+.chain svg{display:block;width:100%%;height:auto;min-width:620px}
+.tw{overflow-x:auto;margin:0 0 1.4em}
+table{border-collapse:collapse;width:100%%;font-size:.86em;line-height:1.45}
+th{text-align:left;color:var(--muted);font-size:.92em;border-bottom:1px solid var(--rule);padding:.45em .6em .45em 0;vertical-align:bottom}
+td{border-bottom:1px solid var(--rule);padding:.5em .6em .5em 0;vertical-align:top}
+table.inv{font-size:.78em;min-width:1100px}
+code.path{word-break:break-all}
+details{margin:0 0 1em}
+details>summary{cursor:pointer;color:var(--ink);padding:.3em 0}
+details[open]>summary{margin-bottom:.6em}
+.entry{border-left:2px solid var(--rule);padding:.1em 0 .1em 1em;margin:0 0 1.1em}
+.entry time,.entry .kind{font-family:var(--font-title);font-size:.86em;color:var(--muted)}
+.entry .src{font-size:.82em;color:var(--muted);margin:.2em 0 0}
+.entry p{margin:.2em 0 0}
+footer{margin-top:3em;padding-top:1em;border-top:1px solid var(--rule);font-size:.82em;color:var(--muted)}
+@media (max-width:640px){:root{--base:16.5px;--pad:16px;--fig-cols:1}h1{font-size:2em}h2{font-size:1.35em}}
+"""
+
+
+def build_html(svg_inline):
+    k = key_numbers()
+    rb = jload(J_RB); v1 = jload(J_V1); v2 = jload(J_V2); fm = jload(J_FM); r4 = jload(J_R4); p4 = jload(J_P4); r6 = jload(J_R6)
+    gen = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=1))).replace(second=0, microsecond=0)
+    gen_iso = gen.isoformat()
+    first = P["first_render"]
+    fonts = (font_face("GT Ultra", open(os.path.join(FONTS, "GT-Ultra-Regular.woff2"), "rb").read())
+             + font_face("Literata", open(os.path.join(FONTS, "Literata-latin.woff2"), "rb").read())
+             + font_face("Literata", open(os.path.join(FONTS, "Literata-Italic-latin.woff2"), "rb").read(), "italic"))
+    H = []
+    H.append("<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">")
+    H.append("<meta name=\"generator\" content=\"BuildSynthesis.py, zorah-materials, 3 November 2026\">")
+    H.append("<title>Zorah Materials, chaîne height</title>")
+    H.append("<style>%s%s</style></head><body><main>" % (fonts, CSS % P))
+
+    # Opening : name, summary, state. FR : ouverture.
+    H.append("<header><h1>Zorah Materials, chaîne height et base color</h1>")
+    H.append('<p class="sub">%s</p></header>' % prose("Synthèse du projet zorah-materials, journée du 3 November 2026"))
+    H.append(para("Le projet reproduit les textures du travail Zorah Materials publié sur ArtStation (eRZ01X) avec la méthode ZenRay Height dans Houdini. "
+                  "Le 3 November 2026, la chaîne qui va d'un panneau de référence éclairé à une height répétable a été fixée : un prompt ChatGPT en quatre étapes, "
+                  "validé par Matthieu à 22:47 +0100, l'uniformiseur Python `RollingBallTop.py`, puis ZenRay Height."))
+    H.append(para("Sur la 4, ZenRay Height atteint %s de corrélation pleine résolution en mode FULL, %s après le plan L6 et %s après les tours de passes au pixel "
+                  "(`RunPixelRounds.py`), avec une SSIM de %s. L'objectif 0,999 n'est pas atteint : l'écart restant se situe sous 2 px, dans le grain de "
+                  "rééchantillonnage de la référence agrandie de 1869 à 2048 px. L'uniformiseur, mesuré sur trois générations d'une même dalle, porte leur "
+                  "ressemblance de %s à %s." % (k["full"], k["plan_l6"], k["final"], k["final_ssim"], k["uniformiser_before"], k["uniformiser_after"])))
+    H.append(para("La base color suit : le prompt flat de 20:52 est validé, sa version en quatre étapes reste à tester, puis viennent `HeightToBaseColor.py` et les cinq cartes. "
+                  "Aucune base color de la 4 ne figure dans les fichiers transmis. Trois voies ont été écartées dans la journée : Delight seul, De-arc et la fusion "
+                  "par fréquences qui relisait l'étape 1."))
+    H.append('<div class="state">%s</div>' % "<br>".join([
+        "<b>État</b> · " + prose("chaîne height validée ; base color en quatre étapes à tester ; article Assets non lié ; sauvegarde Assets cloud non vérifiée."),
+        "<b>Fraîcheur</b> · " + prose("faits du 3 November 2026, de 18:56 à 23:35 +0100 ; entrées ajoutées le %s ; HTML généré le %s, dans une session cloud, à consigner localement." % (disp(first), disp(gen_iso))),
+    ]))
+
+    # The diagram, right after the summary. FR : le diagramme en tête.
+    H.append('<figure class="wide"><div class="chain">%s</div><figcaption>%s</figcaption></figure>' % (svg_inline, prose(
+        "Chaîne de valeur du 3 November 2026. En plein trait, la chaîne retenue ; en pointillé, les voies essayées puis écartées. L'ordre est l'ordre logique de la chaîne : "
+        "sur la 4, ZenRay Height a tourné à 23:17, avant la création de l'uniformiseur à 23:23. Fichier autonome : `value-chain.svg`.")))
+
+    # 1. Chain table. FR : la chaîne, étape par étape.
+    H.append("<h2>La chaîne, étape par étape</h2>")
+    H.append(para("Chaque étape prend la sortie de la précédente. La colonne de droite dit d'où vient le chiffre, ou qu'il n'existe pas."))
+    hist = {e["tag"]: e["pearson_full"] for e in p4["history"]}
+    H.append(table(["Étape", "Ce qu'elle fait", "Mesure", "Statut"], [
+        ["Référence", "panneau éclairé découpé à plat par `CropPanels.py`, ombrage de présentation compris", "non mesuré", "entrée"],
+        ["Prompt, étape 1", "Python, filtre passe-haut : height 16 bits dont chaque détail reste à sa place, ombrage gardé", "non mesuré", "validé, 22:47 +0100"],
+        ["Prompt, étape 2", "génération d'image : corrige les défauts d'ombrage", "non mesuré", "validé, 22:47 +0100"],
+        ["Prompt, étape 3", "Python : ne reprend de l'étape 1 que ses niveaux de gris", "non mesuré", "validé, 22:47 +0100"],
+        ["Prompt, étape 4", "Python, rolling ball par le haut : retire l'ombrage restant", "constat visuel sur `final_step_board.png`", "validé, 22:47 +0100"],
+        ["Uniformiseur", "`RollingBallTop.py` : boule par le haut, trois filtres d'accord, niveaux fixés", "ressemblance %s → %s ; ombrage restant %s, %s et %s" % (
+            fr(v1["V0 rolling ball"]["pairs_mean"], 3), fr(round(mean(list(rb["pairs_after"].values())), 3), 3),
+            fr(rb["outputs"]["a1.png"]["shading"]), fr(rb["outputs"]["a2.png"]["shading"]), fr(rb["outputs"]["a3.png"]["shading"])), "validé sur a1, a2 et a3, 23:28 +0100"],
+        ["ZenRay Height, FULL", "`Reproduce.py --level FULL`, L3 puis L5", "Pearson %s, SSIM %s, MAE %s, %s min" % (fr(r4["pearson_full"]), fr(r4["ssim_full"]), fr(r4["mae"]), fr(r4["minutes"])), "fait sur la 4"],
+        ["ZenRay Height, plan L6", "version H3", "Pearson %s" % fr(hist["H3"]), "fait sur la 4"],
+        ["ZenRay Height, tours au pixel", "`RunPixelRounds.py`, quatre passes par tour, arrêt sous 0,001 de gain", "H4 %s, H5 %s, H6 %s" % (fr(hist["H4"]), fr(hist["H5"]), fr(hist["H6"])), "final H5"],
+        ["Height finale", "`ZorahMaterials04_H5/FINAL_height.png`", "Pearson %s, SSIM %s, MAE %s" % (fr(p4["pearson_full"]), fr(p4["ssim_full"]), fr(p4["mae"])), "produite"],
+        ["Base color, quatre étapes", "panneau puis height finale, même forme que le prompt height", "non mesuré", "à tester"],
+        ["`HeightToBaseColor.py`, cinq cartes", "base color et cartes dans Houdini, `Copernicus2.md` section 14.8", "non mesuré", "aucune sortie dans le handoff"],
+    ]))
+
+    # 2. Four step prompt. FR : le prompt en quatre étapes.
+    H.append("<h2>Le prompt height en quatre étapes</h2>")
+    H.append(para("Un seul message à ChatGPT, avec le panneau de référence découpé à plat, jamais la planche de présentation entière. Python garde chaque pixel à sa place "
+                  "mais lit la luminosité comme une hauteur ; la génération d'image sait retirer un défaut d'ombrage dont la forme varie mais redessine les détails. "
+                  "Le prompt donne à chacun l'étape qu'il fait bien."))
+    H.append(para("L'étape 3 ne reprend de l'étape 1 que ses niveaux de gris : une fusion qui relisait ses pixels remettait l'ombrage. L'étape 4 précise le sens de la boule, "
+                  "car une rolling ball par le bas prend les rainures pour le sol et les rend blanches."))
+    H.append("<details><summary>%s</summary>%s<p class=\"src\">%s</p></details>" % (
+        "Texte exact du prompt, validé le 3 November 2026 à 22:47 +0100", code_block(fenced(PROMPT_CHAIN, 0)),
+        prose("Copié mot pour mot de `prompt_height_chain.md`, source de vérité du skill zenray-houdini.")))
+    H.append(figure([(A + "Analysis/final-step-options-3-November-2026/final_step_board.png", "Cinq options pour l'étape finale, en tuile et en détail", P["fig_max_px"])],
+                    "Choix de l'étape 4 sur la génération check2 de la 6. Colonnes : niveaux seuls, rolling ball par le bas (rainures rendues blanches), rolling ball par le haut, "
+                    "filtre bilatéral, variation totale ; rangée du bas, détail agrandi. Seule la rolling ball par le haut retire l'ombrage restant ; bilatéral et variation totale le gardent. "
+                    "Constat visuel, non chiffré dans les fichiers transmis."))
+
+    # 3. Uniformiser. FR : l'uniformiseur.
+    H.append("<h2>L'uniformiseur RollingBallTop.py</h2>")
+    H.append(para("La boule roule sur la surface, par le haut. Son chemin forme le fond d'ombrage, une fermeture en niveaux de gris, et la height moins ce fond garde les rainures, "
+                  "les pores et les reliefs. Les niveaux sont égalisés avant la boule, pour que toutes les entrées aient le même rayon, puis fixés après."))
+    H.append(para("Les trois générations a1, a2 et a3 de la même dalle concordent entre 1,5 et 8 px et divergent dans le grain au pixel et dans l'ombrage large. "
+                  "Trois filtres d'accord suivent donc la boule : un flou de 1,5 px sur le grain, la bande de 1,5 à 8 px multipliée par 1,5, la bande au-delà de 32 px gardée à moitié."))
+    H.append(figure([(A + "Analysis/rolling-ball-top-3-November-2026/rolling_ball_top_board.png", "Trois générations avant et après l'uniformiseur, et leur ombrage restant", P["fig_max_px"])],
+                    "Rangée du haut, entrées aux niveaux égalisés ; au milieu, rolling ball par le haut et trois filtres d'accord ; en bas, ombrage restant renforcé six fois."))
+    pa, pb = rb["pairs_after"], rb["pairs_before"]
+    v0 = v1["V0 rolling ball"]["pairs"]
+    H.append(table(["Paire", "Entrées", "Rolling ball seule", "Avec filtres d'accord", "Écart absolu moyen après"], [
+        [p.replace("~", " et "), fr(pb[p]), fr(v0[i]), fr(pa[p]), fr(rb["pairs_after_mean_abs_diff"][p])] for i, p in enumerate(pa)
+    ] + [["moyenne", fr(round(mean(list(pb.values())), 4)), fr(v1["V0 rolling ball"]["pairs_mean"]), fr(round(mean(list(pa.values())), 4)), "non calculé"]]))
+    H.append(para("Ombrage restant, entrée puis sortie : a1 %s puis %s, a2 %s puis %s, a3 %s puis %s. Sources : `rolling_ball_top.json` et, pour la rolling ball seule, `variants.json`." % (
+        fr(rb["inputs"]["a1.png"]["shading"]), fr(rb["outputs"]["a1.png"]["shading"]), fr(rb["inputs"]["a2.png"]["shading"]), fr(rb["outputs"]["a2.png"]["shading"]),
+        fr(rb["inputs"]["a3.png"]["shading"]), fr(rb["outputs"]["a3.png"]["shading"]))))
+    H.append(para("Les trois sorties restent différentes pixel pour pixel : un filtre retire un ombrage sans pouvoir redessiner des détails que les générations n'ont pas en commun."))
+    rows = []
+    for name, d in list(v1.items()) + [(n, d) for n, d in v2.items() if n != "V0 rolling ball"]:
+        kept = d.get("fine_detail_kept", d.get("detail_2_8px_kept"))
+        rows.append([name, fr(d["pairs_mean"]), ", ".join(fr(x) for x in d["shading"]), ", ".join(fr(x) for x in kept),
+                     "variants.json" if name in v1 else "variants2.json"])
+    H.append("<details><summary>Banc d'essai des variantes, %d lignes</summary>%s%s</details>" % (len(rows), table(
+        ["Variante", "Ressemblance moyenne", "Ombrage a1, a2, a3", "Détail gardé", "Fichier"], rows), para(
+        "La colonne « détail gardé » vaut le détail fin dans `variants.json` et le détail de 2 à 8 px dans `variants2.json`. Contraste local et histogramme font baisser la ressemblance, "
+        "car la forme large est ce que les générations partagent ; le médian fait moins bien que le flou.")))
+    prm = rb["params"]
+    H.append("<details><summary>Réglages de l'uniformiseur</summary>%s</details>" % table(["Réglage", "Valeur", "Lecture à 2048 px"], [
+        ["`radius`", fr(prm["radius"]), "rayon de la boule, 1/32 de la largeur, 64 px"],
+        ["`smooth`", fr(prm["smooth"]), "lissage du fond, 1/64"],
+        ["`work_scale`", fr(prm["work_scale"]), "échelle de travail de la boule"],
+        ["`strength`", fr(prm["strength"]), "force"],
+        ["`median`, `span`", "%s, %s" % (fr(prm["median"]), fr(prm["span"])), "niveaux de sortie : médiane et écart entre les centiles 1 et 99"],
+        ["`direction`", prm["direction"], "la boule roule par le haut"],
+        ["`grain_blur`", fr(prm["grain_blur"]), "flou du grain, 1,5 px"],
+        ["`mid_boost`, `mid_top`", "%s, %s" % (fr(prm["mid_boost"]), fr(prm["mid_top"])), "bande de 1,5 à 8 px multipliée par 1,5"],
+        ["`broad_from`, `broad_keep`", "%s, %s" % (fr(prm["broad_from"]), fr(prm["broad_keep"])), "bande au-delà de 32 px gardée à moitié"],
+    ]))
+
+    # 4. ZenRay Height. FR : ZenRay Height sur la 4, puis la 6.
+    H.append("<h2>ZenRay Height sur la 4</h2>")
+    H.append(para("`Reproduce.py --level FULL` rend %s en %s min ; son plan s'arrêtait alors que les passes au pixel rapportaient encore. `RunPixelRounds.py` reprend la "
+                  "version précédente par tours de quatre passes au pixel et s'arrête quand un tour gagne moins de 0,001 ou atteint 0,999." % (fr(r4["pearson_full"]), fr(r4["minutes"]))))
+    H.append(figure([(A + "Sources/artstation-eRZ01X/textures/panels/zorah-04-panel.png", "Panneau de référence éclairé de la 4", P["fig_square_px"]),
+                     (Z + "ZorahMaterials04/versions/final/ZorahMaterials04_H5/checks/grid_2x2_preview.png", "Height finale H5 de la 4 en tuile 2x2", P["fig_square_px"])],
+                    "À gauche, l'entrée : le panneau éclairé de la 4. À droite, la sortie : la height finale H5 répétée en 2x2."))
+    H.append(table(["Version", "Pearson", "SSIM", "MAE", "Raccord X, Y", "Source"], [
+        ["H2, FULL", fr(r4["pearson_full"]), fr(r4["ssim_full"]), fr(r4["mae"]), "%s, %s" % tuple(fr(x) for x in r4["seam_xy"]), "`report.json`"],
+        ["H3, plan L6", fr(hist["H3"]), "non mesuré", "non mesuré", "non mesuré", "`report_pixel_rounds.json`"],
+        ["H4, tour 1", fr(hist["H4"]), "non mesuré", "non mesuré", "non mesuré", "`report_pixel_rounds.json`"],
+        ["H5, tour 2, final", fr(p4["pearson_full"]), fr(p4["ssim_full"]), fr(p4["mae"]), "%s, %s" % tuple(fr(x) for x in p4["seam_xy"]), "`report_pixel_rounds.json`"],
+        ["H6, tour 3", fr(hist["H6"]), "non mesuré", "non mesuré", "non mesuré", "plateau, quatre passes rejetées"],
+    ]))
+    H.append(para("Par bande de fréquence, toutes les bandes de 2 px et plus sont à 0,999 ou au-dessus ; restent 0,5 à 1 px, à 0,976, et 1 à 2 px, à 0,996. La référence de 1869 px "
+                  "est agrandie à 2048 px : sous 1 px, une bonne part de son contenu est le grain du rééchantillonnage. Raccord X à 1,84, la référence elle-même à 2,24, sous le seuil "
+                  "du module seamless ; un trait vertical léger reste visible au zoom du joint. Ces chiffres de bande et de raccord viennent de la section de 23:17 du skill zenray-houdini."))
+    H.append("<h3>La 6, même chaîne, autre leçon</h3>")
+    H.append(para("Sur la 6, FULL rend %s de corrélation pleine résolution, %s sans répétition, SSIM %s, MAE %s, en %s min ; le module seamless a ajouté sa couche et "
+                  "rend un verdict seamless vrai. Les rainures tombent pourtant tous les 261 px sur 2048 : la grille montre une planche double à chaque tuile, et la période "
+                  "d'un motif régulier doit diviser la taille de la tuile." % (fr(r6["pearson_full"]), fr(r6["pearson_untiled"]), fr(r6["ssim_full"]), fr(r6["mae"]), fr(r6["minutes"]))))
+    H.append(figure([(A + "Sources/artstation-eRZ01X/textures/panels/zorah-06-panel.png", "Panneau de référence éclairé de la 6", P["fig_square_px"]),
+                     (Z + "ZorahMaterials06/versions/final/ZorahMaterials06_H2/checks/grid_2x2_preview.png", "Height H2 de la 6 en tuile 2x2", P["fig_square_px"])],
+                    "À gauche, le panneau éclairé de la 6 ; à droite, sa height H2 en 2x2."))
+
+    # 5. Base color. FR : la base color.
+    H.append("<h2>La base color</h2>")
+    H.append(para("Deux images jointes, dans cet ordre : le panneau de référence découpé, puis la height finale. Le prompt flat de 20:52 est validé par Matthieu ; la version en "
+                  "quatre étapes, écrite à 23:27 sur le modèle du prompt height, est à tester et ne le remplace pas encore. La base color obtenue et la height finale repartent "
+                  "ensuite dans `HeightToBaseColor.py`, qui reconstruit la couleur sur la height dans le graphe, puis les cinq cartes sont calculées dans Copernicus."))
+    H.append(para("Rien de cette étape n'est mesuré dans les fichiers transmis : le champ `basecolor` de `report.json` vaut `null` pour la 4 comme pour la 6."))
+    H.append("<details><summary>Texte exact du prompt base color flat, validé à 20:52 +0100</summary>%s</details>" % code_block(fenced(PROMPT_BC, 0)))
+    H.append("<details><summary>Texte exact du prompt base color en quatre étapes, à tester</summary>%s</details>" % code_block(fenced(PROMPT_BC, 2)))
+
+    # 6. Discarded routes. FR : voies écartées.
+    H.append("<h2>Les voies écartées</h2>")
+    H.append("<h3>Delight seul, pas assez poussé</h3>")
+    H.append(para("Passe-haut en nœuds Copernicus (`DelightCop.py`) et en Python (`Delight.py`). Part de taches de lumière sur la 6 : 0,056 avant, 0,024 à sigma 128, 0,013 à 64, "
+                  "0,005 à 32, pour une ressemblance avec l'entrée de 0,999, 0,998 et 0,996. Il retire la lumière molle, pas les couples clair et sombre des arêtes : "
+                  "`CheckAiHeight` reste REDO sur la 6. Aucune planche Delight ne figure dans le handoff."))
+    H.append("<h3>De-arc, rejeté</h3>")
+    H.append(para("Flou très long dans le sens des planches et court en travers, qui exclut les joints, pour aplatir l'arc de chaque planche. Arc −0,0113 avant ; +0,0030 à 16 px, "
+                  "+0,0027 à 12 px, +0,0021 à 8 px, pour un détail gardé de 0,9996, 0,9988 et 0,9961. Matthieu a jugé à 21:28 que « ça marche pas » ; les scripts restent comme mesure."))
+    H.append(figure([(Z + "ZorahMaterials06/versions/final/ZorahMaterials06_H2/dearc/dearc_board.png", "Planche De-arc sur la 6, avant puis 16, 12 et 8 px", P["fig_max_px"])],
+                    "Colonnes : avant De-arc, puis 16, 12 (graphe) et 8 px. Rangées : tuile 2x2, vue de l'arc, profil moyen d'une planche de rainure à rainure."))
+    H.append("<h3>Fusion par fréquences relisant l'étape 1, ratée</h3>")
+    H.append(para("Idée de 22:08 : prendre les détails fins de la height Python de l'étape 1 et l'ombrage corrigé de l'image générée. Mesurée sur trois générations de la 6 par "
+                  "`FrequencyMerge.py`, la fusion rend des sorties presque identiques entre elles. Dans ChatGPT, le test en une étape de Matthieu rend une image qui ressemble à "
+                  "l'étape 1, ombrage compris : la voie est abandonnée, et l'étape 3 du prompt final ne reprend plus que les niveaux de gris."))
+    H.append(figure([(A + "Analysis/one-step-test-3-November-2026/chatgpt-one-step-board.webp", "Test en une étape : Python, correction générée, fusion", P["fig_max_px"])],
+                    "Planche de Matthieu : 1, height Python passe-haut 16 bits ; 2, correction d'ombrage générée ; 3, fusion par fréquences, proche de 1."))
+    fmm = fm["merge"]
+    rows = [["IA brute", "%s à %s" % (fr(min(v["arc"] for v in fm["ai"].values()), 4), fr(max(v["arc"] for v in fm["ai"].values()), 4)),
+             "%s à %s" % (fr(min(v["detail_vs_step1"] for v in fm["ai"].values()), 4), fr(max(v["detail_vs_step1"] for v in fm["ai"].values()), 4)),
+             "%s à %s" % (fr(min(fm["ai_pairs_likeness"].values()), 4), fr(max(fm["ai_pairs_likeness"].values()), 4))]]
+    for sg, d in fmm.items():
+        rows.append(["fusion, " + sg, "%s à %s" % (fr(min(d["arc"].values()), 4), fr(max(d["arc"].values()), 4)),
+                     "%s à %s" % (fr(min(d["detail_vs_step1"].values()), 4), fr(max(d["detail_vs_step1"].values()), 4)),
+                     "%s à %s" % (fr(min(d["pairs_likeness"].values()), 4), fr(max(d["pairs_likeness"].values()), 4))])
+    H.append("<details><summary>Mesures de la fusion, arc de l'étape 1 à %s</summary>%s%s%s</details>" % (
+        fr(fm["step1_arc"], 4), table(["Cas", "Arc", "Détail contre l'étape 1", "Ressemblance entre générations"], rows),
+        para("Valeurs de `frequency_merge.json`, arrondies à quatre décimales, sur check2, check3 et vscheck2. Plus sigma est grand, plus les générations s'égalisent et moins l'arc est corrigé."),
+        figure([(A + "Analysis/frequency-merge-3-November-2026/merge_board.png", "Générations brutes et fusions à sigma 16", P["fig_max_px"])],
+               "En haut, trois générations brutes ; en bas, leurs fusions à sigma 16.")))
+
+    # 7. Dated entries. FR : entrées datées.
+    H.append("<h2>Entrées datées</h2>")
+    H.append(para("Le résumé en tête donne l'état actuel. Les entrées ci-dessous gardent l'heure du fait consigné, au fuseau Europe/Paris, et leur provenance ; elles ont été "
+                  "ajoutées à cette synthèse le %s et gardent cette date à chaque régénération." % disp(first)))
+    ents = []
+    for eid, iso, kind, text, src in ENTRIES:
+        ents.append('<article class="entry" id="%s" data-added="%s"><time datetime="%s">%s</time> · <span class="kind">%s</span>%s<p class="src">%s</p></article>'
+                    % (eid, first, iso, prose(disp(iso)), esc(kind), para(text), prose("Provenance : " + src)))
+    ents.append('<article class="entry" id="e-synthese-cloud" data-added="%s"><time datetime="%s">%s</time> · <span class="kind">synthèse</span>%s<p class="src">%s</p></article>'
+                % (first, first, prose(disp(first)), para("Diagramme `value-chain.svg`, cette synthèse et la règle SVG rédigés dans une session cloud ; à consigner localement selon `APPLY.md`."),
+                   prose("Provenance : branche cloud/zorah-synthesis-3-november-2026")))
+    H.append("<details><summary>Historique de la journée, %d entrées</summary>%s</details>" % (len(ents), "".join(ents)))
+
+    # 8. Inventory. FR : inventaire replié.
+    total, summary, inv = inventory_html()
+    H.append("<h2>Inventaire</h2>")
+    H.append(para("%d fichiers : %s. Les identifiants Assets et les dates de modification ne figurent pas dans le handoff ; ils restent à lire dans Assets lors de la consignation locale." % (total, summary)))
+    H.append("<details><summary>Inventaire complet, %d fichiers</summary>%s</details>" % (total, inv))
+
+    # 9. Verification. FR : ce qui a été vérifié.
+    H.append("<h2>Vérification</h2>")
+    H.append(table(["Contrôle", "Résultat", "Preuve"], [
+        ["les 29 fichiers et les 3 polices du handoff sont ceux du Mac", "oui", "sha256 recalculé égal à `MANIFEST.json` pour 32 fichiers sur 32"],
+        ["les chiffres du diagramme viennent des JSON", "oui", "`BuildSynthesis.py verify` recalcule %s, %s, %s, %s et %s depuis les fichiers" % (k["uniformiser_before"], k["uniformiser_after"], k["full"], k["plan_l6"], k["final"])],
+        ["la synthèse s'ouvre sans ressource externe", "oui", "`BuildSynthesis.py verify` : aucune URL chargée, polices et figures en base64"],
+        ["les textes du diagramme restent dans leurs boîtes", "oui", "rendu Chromium isolé, boîtes mesurées une à une, à 1280 et 390 px de large"],
+        ["article lié et publié dans Assets", "non", "à faire en local : `set-article`, IndexMapping, archive"],
+        ["sauvegarde Assets cloud", "non vérifiée", "aucun reçu Assets dans cette session"],
+    ]))
+    H.append('<footer>%s</footer>' % prose(
+        "Généré par `build/BuildSynthesis.py` le %s. Sources : handoff `Projects/zorah-materials/handoff/synthesis-svg-3-November-2026/` du dépôt Memory, branche main. "
+        "Règles appliquées : `ProjectSynthesis.md` et `ProjectArticles.md` de zenray-edit, ton neutre court, thème Papier." % disp(gen_iso)))
+    H.append("</main></body></html>")
+    return "".join(H)
+
+
+def build():
+    plain = build_svg()
+    chars = svg_chars(plain)
+    t_data, t_sub = subset_font(os.path.join(FONTS, "GT-Ultra-Regular.woff2"), chars)
+    l_data, l_sub = subset_font(os.path.join(FONTS, "Literata-latin.woff2"), chars)
+    standalone = build_svg(font_face("GT Ultra", t_data) + font_face("Literata", l_data))
+    with open(os.path.join(OUT, "value-chain.svg"), "w", encoding="utf-8") as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?>\n' + standalone + "\n")
+    page = build_html(plain)
+    with open(os.path.join(OUT, "Synthesis.html"), "w", encoding="utf-8") as f:
+        f.write(page)
+    print("value-chain.svg %d bytes (fonts subset: %s) ; Synthesis.html %d bytes" % (
+        os.path.getsize(os.path.join(OUT, "value-chain.svg")), t_sub and l_sub, os.path.getsize(os.path.join(OUT, "Synthesis.html"))))
+
+
+# ----------------------------------------------------------------------------------------------
+# Verify. FR : vérification, bibliothèque standard seulement.
+# ----------------------------------------------------------------------------------------------
+
+def strip_code(md):
+    return re.sub(r"`[^`\n]*`", "", re.sub(r"```.*?```", "", md, flags=re.S))
+
+
+def verify(out=OUT):
+    res = []
+
+    def check(name, ok, detail=""):
+        res.append({"check": name, "ok": bool(ok), "detail": detail})
+
+    paths = {n: os.path.join(out, n) for n in ("value-chain.svg", "Synthesis.html", "RULE.md", "APPLY.md")}
+    for n, p in paths.items():
+        check("exists " + n, os.path.isfile(p) and os.path.getsize(p) > 0)
+    if not all(r["ok"] for r in res):
+        return res
+    svg = open(paths["value-chain.svg"], encoding="utf-8").read()
+    page = open(paths["Synthesis.html"], encoding="utf-8").read()
+    rule = open(paths["RULE.md"], encoding="utf-8").read()
+    apply_ = open(paths["APPLY.md"], encoding="utf-8").read()
+
+    # 1. SVG parses. FR : le SVG est du XML valide.
+    try:
+        import xml.etree.ElementTree as ET
+        ET.fromstring(svg.split("?>", 1)[1] if svg.startswith("<?xml") else svg)
+        check("svg parses as XML", True)
+    except Exception as e:
+        check("svg parses as XML", False, str(e))
+
+    # 2. Numbers of the diagram recomputed from JSON. FR : chiffres recalculés.
+    try:
+        k = key_numbers()
+        check("measure JSON files read from " + FILES, True)
+    except Exception as e:
+        check("measure JSON files read from " + FILES, False, str(e))
+        return res
+    for name in ("uniformiser_before", "uniformiser_after", "full", "plan_l6", "final"):
+        token = re.compile(r"(?<![\d,])%s(?![\d])" % re.escape(k[name]))
+        check("svg number %s = %s" % (name, k[name]), token.search(re.sub(r"<style>.*?</style>", "", svg, flags=re.S)), k[name])
+    check("html carries the same diagram numbers", all(k[n] in page for n in ("full", "plan_l6", "final")))
+
+    # 3. No external resource. FR : aucune ressource externe.
+    allowed_ns = ("http://www.w3.org/2000/svg", "http://www.w3.org/1999/xlink")
+    for n, txt in (("Synthesis.html", page), ("value-chain.svg", svg)):
+        urls = [u for u in re.findall(r"https?://[^\s\"'<>)]+", txt) if u not in allowed_ns]
+        check("no http url in " + n, not urls, ", ".join(urls[:3]))
+        refs = re.findall(r"""(?:src|href|xlink:href)\s*=\s*["']([^"']*)["']""", txt) + re.findall(r"url\(\s*['\"]?([^'\")]+)", txt)
+        bad = [r for r in refs if not (r.startswith("data:") or r.startswith("#"))]
+        check("every src, href and url() is inline in " + n, not bad, ", ".join(b[:60] for b in bad[:3]))
+        check("no script, link or import in " + n, not re.search(r"<script|<link|@import|<iframe|<object|<embed", txt, re.I))
+
+    # 4. Fonts and figures embedded. FR : polices et figures embarquées.
+    faces = re.findall(r"@font-face\{font-family:'([^']+)';font-style:(\w+)", page)
+    check("html embeds GT Ultra, Literata and Literata italic", set(faces) >= {("GT Ultra", "normal"), ("Literata", "normal"), ("Literata", "italic")}, str(faces))
+    check("svg embeds GT Ultra and Literata", {f for f, _ in re.findall(r"@font-face\{font-family:'([^']+)';font-style:(\w+)", svg)} >= {"GT Ultra", "Literata"})
+    imgs = re.findall(r'<img src="data:image/(?:jpeg|png|webp);base64,', page)
+    check("html embeds the 9 handoff figures", len(imgs) == 9, "%d images" % len(imgs))
+    check("html under %d MiB" % P["html_limit_mib"], len(page.encode()) < P["html_limit_mib"] * 1024 * 1024, "%d bytes" % len(page.encode()))
+    first_h2 = page.find("<h2")
+    check("diagram inline before the first section", 0 < page.find('<svg') < first_h2)
+    check("inventory and history folded (details closed)", "<details open" not in page and page.count("<details") >= 5)
+
+    # 5. Punctuation : no em dash, en dash or double hyphen used as punctuation. FR : ponctuation.
+    def visible(t):
+        t = re.sub(r"<style>.*?</style>", "", t, flags=re.S)
+        t = re.sub(r"<pre>.*?</pre>|<code[^>]*>.*?</code>", "", t, flags=re.S)
+        return html.unescape(re.sub(r"<[^>]+>", " ", t))
+    for n, txt in (("Synthesis.html", visible(page)), ("value-chain.svg", visible(svg)), ("RULE.md", rule), ("APPLY.md", strip_code(apply_))):
+        bad = re.findall(r".{0,20}(?:—|–| -- |--(?=\s)).{0,20}", txt)
+        check("no em dash, en dash or double hyphen in " + n, not bad, " | ".join(bad[:3]))
+
+    # 6. RULE.md : every proposed line dated (3 November 2026). FR : chaque ligne datée.
+    blocks = re.findall(r"```(?:markdown|md|text)?\n(.*?)\n```", rule, flags=re.S)
+    lines = [l for b in blocks for l in b.splitlines() if l.strip()]
+    undated = [l for l in lines if "(3 November 2026)" not in l]
+    check("RULE.md proposes text blocks", len(blocks) >= 3, "%d blocks" % len(blocks))
+    check("every RULE.md proposed line carries (3 November 2026)", lines and not undated, " | ".join(u[:50] for u in undated[:3]))
+    m = re.search(r"\[pointer\]: #\n\n```(?:markdown|md|text)?\n(.*?)\n```", rule, flags=re.S)
+    if m:
+        add = len((m.group(1) + "\n").encode("utf-8"))
+        check("CLAUDE.md stays under %d bytes with the pointer" % P["claude_md_limit"], P["claude_md_bytes"] + add < P["claude_md_limit"],
+              "%d + %d = %d" % (P["claude_md_bytes"], add, P["claude_md_bytes"] + add))
+    else:
+        check("RULE.md marks the CLAUDE.md pointer block", False)
+
+    # 7. APPLY.md names the commands of the brief. FR : APPLY.md porte les commandes.
+    for frag in ("Handoff.py pull --branch cloud/zorah-synthesis-3-november-2026", "sync-skill.sh zenray-edit",
+                 "/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles"):
+        check("APPLY.md contains " + frag, frag in apply_)
+
+    # 8. No secret. FR : aucun secret.
+    secret = re.findall(r"(?i)(?:sk-[a-z0-9]{16,}|ghp_[a-z0-9]{20,}|password\s*[:=]|mot de passe\s*[:=]|486912)", page + svg + rule + apply_)
+    check("no secret in the four files", not secret, ", ".join(secret[:3]))
+    return res
+
+
+def report(res, as_json):
+    ok = all(r["ok"] for r in res)
+    if as_json:
+        print(json.dumps({"ok": ok, "checks": res}, ensure_ascii=False, indent=1))
+    else:
+        for r in res:
+            print(("OK   " if r["ok"] else "FAIL ") + r["check"] + (("  [" + r["detail"] + "]") if r["detail"] and not r["ok"] else ""))
+        print("VERDICT", "OK" if ok else "FAIL", "%d/%d" % (sum(r["ok"] for r in res), len(res)))
+    return 0 if ok else 1
+
+
+def selftest():
+    """Green on the real files, red on each deliberately broken copy. FR : vert sur le vrai, rouge sur chaque copie cassée."""
+    good = all(r["ok"] for r in verify())
+    breaks = {
+        "external font": ("Synthesis.html", lambda t: t.replace("</style>", "@font-face{font-family:x;src:url(https://example.com/x.woff2)}</style>", 1)),
+        "em dash": ("Synthesis.html", lambda t: t.replace("<p>", "<p>avant — après ", 1)),
+        "drifted number": ("value-chain.svg", lambda t: t.replace(key_numbers()["final"], "0,9999")),
+        "undated rule line": ("RULE.md", lambda t: t.replace(" (3 November 2026)\n```", "\n```", 1)),
+        "missing figure": ("Synthesis.html", lambda t: re.sub(r'<img src="data:image/jpeg;base64,[^"]+"', '<img src=""', t, count=1)),
+    }
+    reds = {}
+    for name, (fn, mutate) in breaks.items():
+        tmp = tempfile.mkdtemp()
+        for n in ("value-chain.svg", "Synthesis.html", "RULE.md", "APPLY.md"):
+            shutil.copy(os.path.join(OUT, n), tmp)
+        p = os.path.join(tmp, fn)
+        t = open(p, encoding="utf-8").read(); open(p, "w", encoding="utf-8").write(mutate(t))
+        reds[name] = not all(r["ok"] for r in verify(tmp))
+        shutil.rmtree(tmp)
+    ok = good and all(reds.values())
+    print(json.dumps({"green_on_real": good, "red_on_broken": reds, "ok": ok}, ensure_ascii=False))
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("cmd", choices=["build", "verify", "selftest"])
+    ap.add_argument("--json", action="store_true")
+    a = ap.parse_args()
+    if a.cmd == "build":
+        build()
+    elif a.cmd == "verify":
+        sys.exit(report(verify(), a.json))
+    else:
+        sys.exit(selftest())

@@ -1,0 +1,57 @@
+# 3 November 2026, 22:31 : three candidate final steps for the AI corrected height, in plain Python equivalents.
+# FR : trois étapes finales candidates pour la height corrigée par l'IA, en équivalents Python simples.
+# 1 rolling ball background subtraction, 2 bilateral (edge preserving) smoothing, 3 total variation (plateaux).
+# Usage : python -I FinalStepOptions.py <step1.png> <ai.png> <out_dir>
+import json
+import sys
+import numpy as np
+from PIL import Image, ImageDraw
+from skimage import restoration, transform
+
+P = {"rolling_radius_px": 64, "bilateral_spatial_px": 6, "bilateral_range": 0.05, "tv_weight": 0.02}  # px for 2048
+
+
+def load(path):
+    a = np.asarray(Image.open(path)).astype(np.float64)
+    a /= 65535.0 if a.max() > 255 else 255.0
+    return a[..., :3].mean(axis=2) if a.ndim == 3 else a
+
+
+def match_levels(a, ref):
+    # Step 3 : only the mean and spread of the step 1 height, never its pixels.
+    return (a - a.mean()) / (a.std() + 1e-9) * ref.std() + ref.mean()
+
+
+def main(argv):
+    ref, ai, out = load(argv[0]), load(argv[1]), argv[2]
+    ai = transform.resize(ai, ref.shape, order=3, anti_aliasing=True)
+    s3 = np.clip(match_levels(ai, ref), 0, 1)
+    k = ref.shape[0] / 2048.0
+    small = transform.rescale(s3, 0.25, anti_aliasing=True)  # rolling ball is slow ; background is smooth, so estimate it small
+    # 3 November 2026, 22:33 : the ball must roll from above. From below it takes the dark grooves for the floor and turns them white.
+    # FR : la boule doit rouler par le haut ; par le bas, elle prend les rainures sombres pour le sol et les rend blanches.
+    bg_below = transform.resize(restoration.rolling_ball(small, radius=P["rolling_radius_px"] * k * 0.25), s3.shape, order=3)
+    bg = 1 - transform.resize(restoration.rolling_ball(1 - small, radius=P["rolling_radius_px"] * k * 0.25), s3.shape, order=3)
+    o1 = s3 - bg + bg.mean()
+    o2 = restoration.denoise_bilateral(s3, sigma_color=P["bilateral_range"], sigma_spatial=P["bilateral_spatial_px"] * k)
+    o3 = restoration.denoise_tv_chambolle(s3, weight=P["tv_weight"])
+    o0 = s3 - bg_below + bg_below.mean()
+    imgs = [("base : niveaux seuls", s3), ("1 mal lu : rolling ball par le bas", o0), ("1. rolling ball par le haut", o1), ("2. bilateral", o2), ("3. total variation", o3)]
+    c = 520; y0 = x0 = ref.shape[0] // 3
+    tiles = []
+    for label, a in imgs:
+        full = np.clip((a - a.mean()) / (6 * s3.std()) + 0.5, 0, 1)
+        Image.fromarray((full * 65535).astype(np.uint16)).save(f"{out}/option_{len(tiles)}.png")
+        t = Image.fromarray((full[y0:y0 + c, x0:x0 + c] * 255).astype(np.uint8)).convert("RGB")
+        d = ImageDraw.Draw(t); d.rectangle([0, 0, c, 22], fill=(0, 0, 0)); d.text((6, 5), label, fill=(255, 255, 255))
+        sm = Image.fromarray((full * 255).astype(np.uint8)).resize((c, c)).convert("RGB")
+        tiles.append((t, sm))
+    board = Image.new("RGB", (len(tiles) * (c + 10), 2 * c + 10), (0, 0, 0))
+    for i, (t, sm) in enumerate(tiles):
+        board.paste(sm, (i * (c + 10), 0)); board.paste(t, (i * (c + 10), c + 10))
+    board.save(f"{out}/final_step_board.png")
+    print(json.dumps({"params": P, "size": ref.shape}))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

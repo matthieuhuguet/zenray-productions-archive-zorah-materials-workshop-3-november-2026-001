@@ -1,0 +1,299 @@
+# 4 November 2026, 02:38 : de-lighting tournament for a base color taken straight from the lit reference panel (no AI generation).
+# FR : tournoi de délighting, la base color tirée directement du panneau éclairé, sans génération d'image.
+#
+# Bench with a known truth : an albedo (the harmonised d2) is lit by the illumination measured on the real panel (broad light and
+# cast shadow bands from panel / albedo, relief shading from the final height normals, light direction regressed on the panel).
+# Sixteen methods of distinct principle recover the albedo ; each plays four phases (its main scale, coarse to fine).
+# Scores are correlations with the truth in log luminance (fine detail, mid detail, broad level = light removed with block tints kept,
+# full) and a chromaticity error ; the bracket plays 16 -> 8 -> 4 -> 2 -> 1 on the best phase of each method.
+# Then every method (best phase) runs on the real panel for the visual verdict.
+# Usage : python -I DelightTournament.py <panel.png> <height16.png> <albedo.png> <out_dir> [--selftest]
+import json
+import sys
+import time
+
+import numpy as np
+from PIL import Image
+from scipy import ndimage as ndi
+
+N = 1024
+P = {"size": N, "normal_std": 0.15, "light_blur": 18, "phases": 4}
+
+
+def load_rgb(p, n=N):
+    a = np.asarray(Image.open(p).convert("RGB").resize((n, n), Image.LANCZOS)).astype(np.float64) / 255.0
+    return np.where(a <= 0.04045, a / 12.92, ((a + 0.055) / 1.055) ** 2.4)
+
+
+def load_h(p, n=N):
+    a = np.asarray(Image.open(p)).astype(np.float64)
+    a = a[..., 0] if a.ndim == 3 else a
+    return np.asarray(Image.fromarray((a / a.max()).astype(np.float32)).resize((n, n), Image.BILINEAR), np.float64)
+
+
+def to_srgb(l):
+    l = np.clip(l, 0, 1)
+    return np.where(l <= 0.0031308, l * 12.92, 1.055 * l ** (1 / 2.4) - 0.055)
+
+
+def lum(lin):
+    return np.maximum(lin @ np.array([0.2126, 0.7152, 0.0722]), 1e-5)
+
+
+def blur(x, s):
+    return ndi.gaussian_filter(x, s, mode="reflect") if s > 0 else x
+
+
+def normals(h):
+    gy, gx = np.gradient(blur(h, 0.7))
+    k = P["normal_std"] / max(np.hypot(gx, gy).std(), 1e-9)
+    n = np.stack([-gx * k, -gy * k, np.ones_like(h)], -1)
+    return n / np.linalg.norm(n, axis=-1, keepdims=True)
+
+
+def small(x, n):
+    return np.asarray(Image.fromarray(x.astype(np.float32)).resize((n, n), Image.BILINEAR), np.float64)
+
+
+def big(x, n=N):
+    return np.asarray(Image.fromarray(x.astype(np.float32)).resize((n, n), Image.BICUBIC), np.float64)
+
+
+def poly_surface(z, deg, mask=None):
+    n = z.shape[0]; s = small(z, 128); m = None if mask is None else small(mask.astype(float), 128) > 0.5
+    yy, xx = np.mgrid[0:128, 0:128] / 127.0 - 0.5
+    T = lambda X, Y: np.stack([X ** i * Y ** j for i in range(deg + 1) for j in range(deg + 1 - i)], -1)
+    A = T(xx, yy).reshape(-1, T(xx, yy).shape[-1]); b = s.ravel()
+    if m is not None:
+        A, b = A[m.ravel()], b[m.ravel()]
+    c, *_ = np.linalg.lstsq(A, b, rcond=None)
+    Y, X = np.mgrid[0:n, 0:n] / (n - 1.0) - 0.5
+    return T(X, Y) @ c
+
+
+def poisson(gx, gy):
+    # Reconstruct a field from its gradients (mirror padded FFT solve).
+    h, w = gx.shape
+    div = np.zeros_like(gx); div[:, 1:] += gx[:, 1:] - gx[:, :-1]; div[1:, :] += gy[1:, :] - gy[:-1, :]
+    d = np.block([[div, div[:, ::-1]], [div[::-1, :], div[::-1, ::-1]]])
+    fy = np.fft.fftfreq(2 * h)[:, None]; fx = np.fft.fftfreq(2 * w)[None, :]
+    den = 2 * np.cos(2 * np.pi * fx) + 2 * np.cos(2 * np.pi * fy) - 4; den[0, 0] = 1
+    u = np.real(np.fft.ifft2(np.fft.fft2(d) / den)); return u[:h, :w]
+
+
+def guided(I, p, r, eps):
+    box = lambda x: ndi.uniform_filter(x, 2 * r + 1, mode="reflect")
+    mI, mp = box(I), box(p); a = (box(I * p) - mI * mp) / (box(I * I) - mI * mI + eps); b = mp - a * mI
+    return box(a) * I + box(b)
+
+
+def bilateral_low(z, s_sp, s_r, n=256):
+    zs = small(z, n); k = s_sp * n / N
+    # joint bilateral by range slicing (piecewise linear in range), at low resolution
+    lo, hi = np.percentile(zs, 0.5), np.percentile(zs, 99.5); levels = np.linspace(lo, hi, 12)
+    out = np.zeros_like(zs); wsum = np.zeros_like(zs)
+    for v in levels:
+        wr = np.exp(-((zs - v) ** 2) / (2 * s_r ** 2))
+        num, den = blur(zs * wr, k), blur(wr, k)
+        val = num / np.maximum(den, 1e-9)
+        wv = np.exp(-((zs - v) ** 2) / (2 * (s_r * 0.6) ** 2))
+        out += val * wv; wsum += wv
+    return big(out / np.maximum(wsum, 1e-9))
+
+
+def blocks_from_height(h):
+    lo = np.percentile(h, 12)
+    inside = ndi.binary_erosion(h > lo, iterations=3)
+    lab, n = ndi.label(inside)
+    sizes = ndi.sum(np.ones_like(h), lab, range(1, n + 1))
+    keep = np.zeros(n + 1, bool); keep[1:] = sizes > 1500
+    lab = np.where(keep[lab], lab, 0)
+    return lab
+
+
+# ---- the sixteen methods : each returns the log illumination to remove (log Y_out = log Y - illum) ----
+def m01_flat_blur(z, ctx, s):        return blur(z, s)
+def m02_poly(z, ctx, s):             return poly_surface(z, int(s))
+def m03_msr(z, ctx, s):              return np.mean([blur(z, s / 4), blur(z, s), blur(z, s * 4)], axis=0)
+def m04_bilateral(z, ctx, s):        return bilateral_low(z, s, 0.25)
+def m05_guided(z, ctx, s):           return guided(blur(z, 2), z, int(s), 0.02)
+def m06_closing(z, ctx, s):
+    zs = small(z, 256); k = max(3, int(s * 256 / N)); return big(blur(ndi.grey_closing(zs, size=(k, k)), k / 2)) - 0.0
+def m07_sh_poly(z, ctx, s):
+    n = ctx["n"]; A = np.stack([np.ones_like(z), n[..., 0], n[..., 1], n[..., 0] * n[..., 1], n[..., 0] ** 2 - n[..., 1] ** 2], -1).reshape(-1, 5)
+    hp = (z - blur(z, s)).ravel(); c, *_ = np.linalg.lstsq(A[:, 1:], hp, rcond=None)
+    relief = (A[:, 1:] @ c).reshape(z.shape); return relief + poly_surface(z - relief, 2)
+def m08_local_normals(z, ctx, s):
+    n = ctx["n"]; t = int(s); hgt, w = z.shape; c0 = np.zeros((t, t)); c1 = np.zeros((t, t)); c2 = np.zeros((t, t))
+    for i in range(t):
+        for j in range(t):
+            sl = (slice(i * hgt // t, (i + 1) * hgt // t), slice(j * w // t, (j + 1) * w // t))
+            A = np.stack([np.ones(z[sl].size), n[sl][..., 0].ravel(), n[sl][..., 1].ravel()], -1)
+            c, *_ = np.linalg.lstsq(A, z[sl].ravel(), rcond=None); c0[i, j], c1[i, j], c2[i, j] = c
+    return big(c0) + big(c1) * n[..., 0] + big(c2) * n[..., 1]
+def m09_blocks(z, ctx, s):
+    lab = ctx["lab"]; ids = np.unique(lab[lab > 0]); field = np.zeros_like(z); hgt, w = z.shape
+    Y, X = np.mgrid[0:hgt, 0:w] / float(w)
+    means, cy, cx = [], [], []
+    for k in ids:
+        m = lab == k; A = np.stack([np.ones(m.sum()), X[m], Y[m]], -1); c, *_ = np.linalg.lstsq(A, z[m], rcond=None)
+        field[m] = c[1] * (X[m] - X[m].mean()) + c[2] * (Y[m] - Y[m].mean()); means.append(z[m].mean()); cy.append(Y[m].mean()); cx.append(X[m].mean())
+    # block means : a smooth surface through them is the light, what is left is the block tint
+    cy, cx, means = np.array(cy) - 0.5, np.array(cx) - 0.5, np.array(means); d = int(s)
+    T = lambda Xa, Ya: np.stack([Xa ** i * Ya ** j for i in range(d + 1) for j in range(d + 1 - i)], -1)
+    c, *_ = np.linalg.lstsq(T(cx, cy), means, rcond=None); smooth = T(X - 0.5, Y - 0.5) @ c
+    idx = ndi.distance_transform_edt(lab == 0, return_distances=False, return_indices=True)
+    field = field[idx[0], idx[1]] if (lab == 0).any() else field
+    return field + smooth
+def m10_horn(z, ctx, s):
+    gy, gx = np.gradient(z); g = np.hypot(gx, gy); t = np.percentile(g, s)
+    keep = g > t; rx, ry = gx * keep, gy * keep; refl = poisson(rx, ry); return z - refl
+def m11_lcn(z, ctx, s):
+    mu = blur(z, s); sd = np.sqrt(np.maximum(blur((z - mu) ** 2, s), 1e-6)); out = (z - mu) / sd * (z - mu).std()
+    return z - out
+def m12_pyramid(z, ctx, s):
+    # bands kept with a local gain : each band divided by its local energy and set to the global energy, low band flat
+    out = np.zeros_like(z); prev = z
+    for k in range(int(s)):
+        low = blur(z, 2 ** (k + 1)); band = prev - low if k else z - low
+        e = np.sqrt(blur(band ** 2, 2 ** (k + 3))) + 1e-4; out += band / e * np.sqrt((band ** 2).mean()); prev = low
+    return z - out
+def m13_shadow_regions(z, ctx, s):
+    I = blur(z, s); t = np.percentile(I, 50); w = I.std() * 0.35
+    matte = 1 / (1 + np.exp(-(I - t) / max(w, 1e-6)))
+    r = (I * matte).sum() / matte.sum() - (I * (1 - matte)).sum() / (1 - matte).sum()
+    relit = z + r * (1 - matte); return z - relit + poly_surface(relit, 2)
+def m14_chroma_gradient(z, ctx, s):
+    ch = ctx["chroma"]; low = blur(z, s); gy, gx = np.gradient(low)
+    cg = np.hypot(*np.gradient(blur(ch[..., 0], s))) + np.hypot(*np.gradient(blur(ch[..., 1], s)))
+    w = cg / (cg + np.percentile(cg, 75) + 1e-9); low_r = poisson(gx * w, gy * w)
+    return low - low_r
+def m15_rank(z, ctx, s):
+    zs = small(z, 256); k = max(3, int(s * 256 / N)); return big(blur(ndi.percentile_filter(zs, 70, size=(k, k)), k / 2))
+def m16_hybrid(z, ctx, s):
+    rel = m08_local_normals(z, ctx, 8) - big(small(m08_local_normals(z, ctx, 8), 8)); zz = z - rel
+    return rel + bilateral_low(zz, s, 0.25)
+
+
+METHODS = [
+    ("M01", "champ plat (flou)", m01_flat_blur, [128, 64, 32, 16]),
+    ("M02", "surface polynomiale", m02_poly, [2, 3, 4, 6]),
+    ("M03", "Retinex multi échelle", m03_msr, [128, 64, 32, 16]),
+    ("M04", "bilatéral (bords de lumière gardés)", m04_bilateral, [64, 32, 16, 8]),
+    ("M05", "filtre guidé", m05_guided, [64, 32, 16, 8]),
+    ("M06", "fermeture (rolling ball haut)", m06_closing, [128, 64, 32, 16]),
+    ("M07", "harmoniques sur normales + polynôme", m07_sh_poly, [64, 32, 16, 8]),
+    ("M08", "normales locales par tuiles", m08_local_normals, [4, 8, 16, 32]),
+    ("M09", "blocs segmentés par la height", m09_blocks, [1, 2, 3, 4]),
+    ("M10", "Retinex de Horn (gradients)", m10_horn, [50, 70, 85, 95]),
+    ("M11", "normalisation locale du contraste", m11_lcn, [128, 64, 32, 16]),
+    ("M12", "pyramide à gain local", m12_pyramid, [4, 5, 6, 7]),
+    ("M13", "régions d'ombre rééclairées", m13_shadow_regions, [48, 32, 24, 16]),
+    ("M14", "gradients guidés par la chromaticité", m14_chroma_gradient, [16, 8, 4, 2]),
+    ("M15", "filtre de rang (70e percentile)", m15_rank, [128, 64, 32, 16]),
+    ("M16", "hybride normales locales + bilatéral", m16_hybrid, [64, 32, 16, 8]),
+]
+
+
+def apply(lin, ctx, fn, s):
+    Y = lum(lin); z = np.log(Y)
+    il = fn(z, ctx, s); zo = z - il; Yo = np.exp(zo - zo.mean() + z.mean())
+    return lin * (Yo / Y)[..., None]
+
+
+def chroma(lin):
+    s = lin.sum(-1, keepdims=True) + 1e-6; return (lin / s)[..., :2]
+
+
+def scores(out, truth):
+    a, b = np.log(lum(out)), np.log(lum(truth))
+    c = lambda x, y: float(np.corrcoef(x.ravel(), y.ravel())[0, 1])
+    hp = lambda x: x - blur(x, 1.5); bp = lambda x: blur(x, 1.5) - blur(x, 12); br = lambda x: blur(x, 12)
+    co, ct = chroma(out), chroma(truth); co = co - co.mean((0, 1)) + ct.mean((0, 1))
+    r = {"fine": c(hp(a), hp(b)), "mid": c(bp(a), bp(b)), "broad": c(br(a), br(b)), "full": c(a, b),
+         "chroma_err": float(np.abs(co - ct).mean() * 1000)}
+    r["score"] = (r["fine"] + r["mid"] + 2 * r["broad"] + r["full"]) / 5 - r["chroma_err"] / 100
+    return {k: round(v, 4) for k, v in r.items()}
+
+
+def build_bench(panel, h, albedo):
+    n = normals(h); Yp, Ya = lum(panel), lum(albedo)
+    S = blur(blur(np.log(Yp), P["light_blur"]) - blur(np.log(Ya), P["light_blur"]), 6)
+    hp = np.log(Yp) - blur(np.log(Yp), 8)
+    A = np.stack([n[..., 0] - blur(n[..., 0], 8), n[..., 1] - blur(n[..., 1], 8)], -1).reshape(-1, 2)
+    k, *_ = np.linalg.lstsq(A, hp.ravel(), rcond=None)
+    relief = k[0] * n[..., 0] + k[1] * n[..., 1]
+    lit = albedo * np.exp(S + relief - (S + relief).mean())[..., None]
+    return lit, n, k
+
+
+def board(rows, out_path, labels, n_cols=6, c=300):
+    from PIL import ImageDraw, ImageFont
+    f = ImageFont.truetype("/Users/zenray/Library/Fonts/GT-Ultra-Standard-Regular.otf", 15)
+    nr = (len(rows) + n_cols - 1) // n_cols
+    img = Image.new("RGB", (n_cols * (c + 8), nr * (c + 44)), (22, 22, 24)); d = ImageDraw.Draw(img)
+    for i, (im, lab) in enumerate(zip(rows, labels)):
+        x, y = (i % n_cols) * (c + 8), (i // n_cols) * (c + 44)
+        img.paste(Image.fromarray((to_srgb(im) * 255).astype(np.uint8)).resize((c, c), Image.LANCZOS), (x, y + 40))
+        for j, line in enumerate(lab.split("\n")[:2]):
+            d.text((x + 4, y + 4 + j * 18), line, fill=(235, 235, 235), font=f)
+    img.save(out_path)
+
+
+def expose_like(out, ref):
+    # Retinex key light of the reference : mean reflectance x 90th percentile of its illumination (no fixed value)
+    Yr = lum(ref); I = blur(Yr, N / 8); key = float((Yr / I).mean() * np.percentile(I, 90))
+    return out * key / float(lum(out).mean())
+
+
+def main(argv):
+    panel_p, h_p, alb_p, out = argv[:4]
+    panel, h, albedo = load_rgb(panel_p), load_h(h_p), load_rgb(alb_p)
+    lit, n, k = build_bench(panel, h, albedo)
+    ctx_b = {"n": n, "lab": blocks_from_height(h), "chroma": chroma(lit)}
+    rep = {"light_direction_fit": [round(float(v), 4) for v in k], "blocks": int(len(np.unique(ctx_b["lab"])) - 1)}
+    # verifier both ways : truth against itself, the lit input, the inverted truth
+    rep["check_truth"] = scores(albedo, albedo); rep["check_lit_input"] = scores(lit, albedo)
+    rep["check_inverted"] = scores(np.exp(-np.log(np.maximum(albedo, 1e-4))) * 1e-3, albedo)
+    print("verifier", rep["check_truth"]["score"], rep["check_lit_input"]["score"], rep["check_inverted"]["score"])
+    if "--selftest" in argv:
+        ok = rep["check_truth"]["score"] > 0.99 and rep["check_lit_input"]["score"] < 0.9 and rep["check_inverted"]["score"] < 0
+        print("selftest", ok); return 0 if ok else 1
+    res = {}
+    for code, name, fn, phases in METHODS:
+        t0 = time.time(); ph = []
+        for s in phases:
+            try:
+                sc = scores(apply(lit, ctx_b, fn, s), albedo)
+            except Exception as e:  # a phase that fails is recorded, never hidden
+                sc = {"score": -9, "error": str(e)[:120]}
+            ph.append({"param": s, **sc})
+        best = max(ph, key=lambda q: q["score"]); res[code] = {"name": name, "phases": ph, "best": best, "seconds": round(time.time() - t0, 1)}
+        print(code, name, "best", best["param"], best["score"], "fine", best.get("fine"), "broad", best.get("broad"), f"{res[code]['seconds']} s", flush=True)
+    rep["methods"] = res
+    # bracket 16 -> 8 -> 4 -> 2 -> 1 on the best phase score
+    rnd, alive, bracket = 1, [m[0] for m in METHODS], []
+    while len(alive) > 1:
+        nxt = []
+        for a, b in zip(alive[0::2], alive[1::2]):
+            sa, sb = res[a]["best"]["score"], res[b]["best"]["score"]; w = a if sa >= sb else b
+            bracket.append({"round": rnd, "a": a, "b": b, "score_a": sa, "score_b": sb, "winner": w}); nxt.append(w)
+        alive, rnd = nxt, rnd + 1
+    rep["bracket"] = bracket; rep["winner"] = alive[0]
+    # real panel : every method at its best phase, plus the bench boards
+    ctx_r = {"n": n, "lab": ctx_b["lab"], "chroma": chroma(panel)}
+    tiles_r, labels_r, tiles_b, labels_b = [panel], ["panneau (entrée)"], [albedo, lit], ["vérité du banc", "banc éclairé"]
+    for code, name, fn, phases in METHODS:
+        s = res[code]["best"]["param"]
+        o = expose_like(apply(panel, ctx_r, fn, s), panel); tiles_r.append(o); labels_r.append(f"{code} {name}\nparam {s}  banc {res[code]['best']['score']}")
+        Image.fromarray((to_srgb(o) * 255).astype(np.uint8)).save(f"{out}/real_{code}.png")
+        tiles_b.append(apply(lit, ctx_b, fn, s)); labels_b.append(f"{code} {name}\nscore {res[code]['best']['score']}")
+    board(tiles_r, f"{out}/sheet_real_panel.png", labels_r)
+    board(tiles_b, f"{out}/sheet_bench.png", labels_b)
+    json.dump(rep, open(f"{out}/tournament.json", "w"), indent=1, ensure_ascii=False)
+    print("winner", rep["winner"]); print(json.dumps(bracket))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,0 +1,141 @@
+# Prompt base color ChatGPT, Zorah Materials (3 November 2026, 20:46 +0100)
+
+## V5 tout en Python, en cinq étapes : délighting depuis la référence, sans génération d'image (4 November 2026, 02:52 +0100)
+
+- Mots de Matthieu (4 November 2026, 02:36) : ce que font le prompt et le Python ne marche pas du tout ; le prompt fait trop de variations qui changent complètement l'image, les couleurs ne sont pas bonnes ; repartir de zéro, corriger la base color pour retirer le bug d'ombrage et garder le plus de détails, sans lighting. Puis (02:49) : M02 et M13 sont excellents, adapte-les par un nouveau round et adapte le prompt complet. (4 November 2026)
+- Tournoi (`/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Analysis/delight-tournament-4-November-2026/METHODS.md`) : seize méthodes sur un banc à vérité connue, puis huit variantes de M02 et M13 ; vainqueur R07 réglé, régions d'ombre rééclairées à trois niveaux puis surface lisse du troisième degré sur la pierre seule : 0,857 contre 0,692 pour l'entrée éclairée, détail fin gardé à 0,991, lumière restante sur le vrai panneau 0,40 (M02 seule 0,51). Script local : `scripts/height/DelightBaseColor.py`. La génération d'image est retirée : e4check gardait les bandes du panneau presque pixel pour pixel. (4 November 2026)
+- La V4 (balance des blancs après génération) est abandonnée (4 November 2026, 02:36). La V5 remplace la version détaillée M4 comme prompt de base color ; elle reste à tester dans ChatGPT par Matthieu. (4 November 2026)
+
+```text
+Respecte absolument l'ordre de ce prompt, une étape après l'autre. N'utilise jamais la génération d'image, à aucune étape : tout se fait en Python, sur les pixels de l'image 1, pour que la composition et les couleurs restent exactement les siennes. Image 1 = la référence en couleur, éclairée. Image 2 = la height finale de la même surface, même cadrage. Le but est une base color qui garde toute l'information de couleur et tout le détail de l'image 1, et qui ne garde rien de sa lumière (spot, bandes d'ombre portée, dégradés).
+
+Étape 1. En Python, lis l'image 1 en lumière linéaire (sRGB décodé), à la taille de l'image 2. Calcule sa luminance et garde à part la chromaticité de chaque pixel, c'est-à-dire le rapport de chaque canal à la luminance : c'est elle qui portera toute la couleur à la fin, et elle ne sera jamais modifiée. Travaille ensuite sur le logarithme de la luminance. then redo with 99.9% precision in the composition.
+
+Étape 2, seulement une fois l'étape 1 obtenue. En Python, rééclaire les régions d'ombre : lisse le logarithme de la luminance par un flou gaussien d'environ un soixante-quatrième de la largeur, pour ne plus voir que la lumière ; découpe ce flou en trois niveaux de lumière à ses tertiles (ombre, demi-jour, lumière) ; pour chaque passage d'un niveau au suivant, mesure la marche de lumière (moyenne du niveau du dessus moins moyenne du niveau du dessous) et retire-la à travers un masque doux, une sigmoïde dont la largeur vaut environ un tiers de l'écart type du flou, de sorte que les bandes d'ombre portée et le spot disparaissent sans bord dur. Seule la luminance change. then redo with 99.9% precision in the composition.
+
+Étape 3, seulement une fois l'étape 2 obtenue. En Python, retire le dégradé de lumière très large qui reste : sur l'image 2, repère les joints et les creux profonds (la height plus basse que sa moyenne locale, prise sur un soixante-quatrième de la largeur, d'environ deux écarts types) et laisse-les de côté ; ajuste sur la pierre seule une surface polynomiale lisse du troisième degré au logarithme de la luminance de l'étape 2, puis soustrais-la en gardant la moyenne. Chaque bloc ou chaque zone garde ainsi sa propre clarté. then redo with 99.9% precision in the composition.
+
+Étape 4, seulement une fois l'étape 3 obtenue. En Python, recompose la couleur : multiplie, pixel par pixel, la chromaticité gardée à l'étape 1 par la nouvelle luminance, sans toucher aux teintes ni à la saturation. Puis cale l'exposition à la façon Retinex, sur la référence et jamais sur une valeur fixe : sépare l'image 1 en réflectance et illumination (sa luminance divisée par son flou très large, un huitième de la largeur), puis, en lumière linéaire, multiplie les trois canaux par un même facteur pour que la luminosité moyenne de la base color égale la réflectance moyenne de l'image 1 exposée à sa lumière principale, c'est-à-dire au niveau de ses zones les mieux éclairées (90e percentile de l'illumination). Même taille que l'image 2, PNG 8 bits. then redo with 99.9% precision in the composition.
+
+Étape 5, seulement une fois l'étape 4 obtenue. En Python, contrôle le résultat avant de le rendre, et donne les trois mesures : le détail fin (passe-haut de la luminance) doit rester corrélé à au moins 0,98 avec celui de l'image 1 ; la saturation moyenne doit rester au moins égale à celle de l'image 1 ; la lumière ne doit plus se voir, donc la luminance très floutée de la base color doit être nettement moins corrélée à celle de l'image 1 que l'image 1 à elle-même. Si un contrôle échoue, refais l'étape fautive (un flou un peu plus large à l'étape 2 si le détail baisse, un quatrième niveau de lumière si une bande reste visible), puis rends la base color finale.
+```
+
+- Ensuite, en local, la même méthode : `/Users/zenray/.venvs/zenray-uv/bin/python -I /Users/zenray/.claude/skills/zenray-houdini/scripts/height/DelightBaseColor.py apply <panneau.png> <base_color.png> --height <FINAL_height.png>` ; mesures sur la 4 de Zorah : détail gardé 1,0, lumière restante 0,40, saturation 1,0. (4 November 2026)
+
+
+
+## V4 ABANDONNÉE le 4 November 2026 à 02:36 (« ça marche pas du tout »), garder toute l'information de couleur, ne retirer que la lumière (4 November 2026, 02:14 +0100)
+
+- Mots de Matthieu (4 November 2026, 02:09) : plus la base color est flat, mieux ce n'est pas ; C3 n'était pas mieux que D2, plus on gardait de détails sur l'information de couleur, mieux c'était ; le Retinex et le reste aplatissent la couleur et font perdre de la saturation ; une nouvelle version doit garder un maximum d'infos tout en enlevant l'ombrage. (4 November 2026)
+- Mesures sur la 4 de Zorah, en Lab, `Scripts/BaseColorInfo.py` du projet (`/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Analysis/basecolor-information-4-November-2026/`). C3 et D2 viennent du même prompt détaillé : l'écart vient donc de la génération, et le prompt doit l'empêcher. C3 est la plus plate (ombrage restant 0,55 contre 1,27) mais elle l'est devenue en lissant : détail fin de luminance 3,64 contre 6,53 (moins 44 %), ressemblance de structure au panneau 0,37 contre 0,59, variété des teintes des blocs 1,94 contre 2,50 (panneau 3,95). (4 November 2026)
+- La perte de saturation ne vient ni du Retinex ni du champ plat, qui ne touchent que la luminance : elle vient du transfert Reinhard, qui pose la moyenne et l'écart de a et b du panneau, image éclairée et plus sombre (L 43 contre 57) ; en Lab, une même couleur paraît moins saturée quand elle est plus sombre. Mesuré sur D2 : saturation 20,4, puis 15,9 après M4 (moins 22 %) ; teintes des blocs 2,50 puis 2,16, le flou du champ plat (1/8 de la largeur) étant plus petit que deux blocs. (4 November 2026)
+- V4 remplace Reinhard par une balance des blancs en lumière linéaire (rapports R/G et B/G, indépendants de la luminosité) et le flou du champ plat par une surface lisse du second degré ; le Retinex reste. Mesuré avec `HarmoniseBaseColor.py --steps flat_poly,white_balance,exposure` : D2 saturation 19,65 (96 % gardés), teintes des blocs 2,45 (98 %), détail de couleur 2,67 (99 %) ; D1 teintes 3,66, proches du panneau ; les trois générations restent harmonisées, écart 11,5 puis 6,2 (5,7 avec M4). Planche : `basecolor_M4_vs_V4.png`. M4 reste la source de vérité jusqu'au test de Matthieu. (4 November 2026)
+
+```text
+Respecte absolument l'ordre de ce prompt, une étape après l'autre. Image 1 = la référence en couleur, éclairée. Image 2 = la height finale de la même surface. Le but est une base color qui garde toute l'information de couleur de la matière (la teinte propre de chaque bloc ou de chaque zone, les taches, les veines, les pores, les mouchetures, la saturation et le contraste fin) et qui ne garde rien de la lumière.
+
+Étape 1. Fais la base color flat de l'image 1, calée sur l'image 2 : même cadrage, chaque détail exactement à la même place que sur la height, pixel pour pixel. Couleur de la matière seulement, sans lumière, sans ombre, sans relief ; aucune couleur n'est lissée, adoucie ni uniformisée. then redo with 99.9% precision in the composition.
+Pour cette étape, n'utilise pas la génération d'image. En Python, calcule la base color flat de l'image 1 : retire l'éclairage de grande échelle par un filtre passe-haut sur la luminance seulement, les deux canaux de couleur restant intacts, même taille et même cadrage que l'image 2, PNG 8 bits. then redo with 99.9% precision in the composition.
+
+Étape 2, seulement une fois la base color de l'étape 1 obtenue. With AI gen create image : corrige les défauts d'éclairage de cette base color (ombres, reflets, relief éclairé, taches de lumière) et rien d'autre. Garde toute l'information de couleur : la teinte propre de chaque bloc ou de chaque zone, les taches, les veines, les pores, les mouchetures, la saturation et le contraste fin ; ne lisse pas, ne floute pas, n'uniformise pas, ne désature pas. Chaque détail de couleur reste à la place de son relief sur l'image 2.
+
+Étape 3, seulement une fois l'image de l'étape 2 obtenue. En Python, pars de l'image de l'étape 2 et cale seulement sa teinte moyenne sur celle de l'étape 1, par une balance des blancs en lumière linéaire : un seul gain par canal, choisi pour que les rapports moyens rouge sur vert et bleu sur vert égalent ceux de l'étape 1. Ces rapports ne dépendent pas de la luminosité, si bien qu'une référence plus sombre ne fait pas baisser la saturation. Ne touche ni à la saturation, ni au contraste, ni aux écarts de teinte entre les zones, ni aux pixels : de l'étape 1, ne reprends que sa teinte moyenne, jamais ses ombres ni sa lumière. Même taille que l'image 2, PNG 8 bits. then redo with 99.9% precision in the composition.
+
+Étape 4, seulement une fois l'image de l'étape 3 obtenue. En Python, sur cette image seulement : d'abord retire le seul dégradé de lumière très large qui pourrait rester, en divisant la luminance par une surface lisse ajustée sur elle (ajustement polynomial du second degré sur toute l'image), et non par un flou, afin que chaque bloc ou chaque zone garde sa propre clarté ; les deux canaux de couleur ne changent pas. Puis cale l'exposition à la façon Retinex, sur la référence et jamais sur une valeur fixe : sépare l'image 1 en réflectance et illumination (sa luminance divisée par son flou très large), puis, en lumière linéaire, multiplie les trois canaux par un même facteur pour que la luminosité moyenne de la base color égale la réflectance moyenne de l'image 1 exposée à sa lumière principale, c'est-à-dire au niveau de ses zones les mieux éclairées (haut percentile de l'illumination) ; la teinte et la saturation ne changent pas. Enfin, contrôle en Python : la saturation moyenne (écart entre les canaux rapporté à la luminosité) et la variété des teintes entre les zones de l'image finale doivent rester au moins égales à celles de l'image de l'étape 2 ; si l'une a baissé, refais l'étape qui l'a fait baisser. Même taille, PNG 8 bits. then redo with 99.9% precision in the composition.
+```
+
+- Ensuite : plusieurs générations s'harmonisent en local par le même concept, `/Users/zenray/.venvs/zenray-uv/bin/python -I /Users/zenray/.claude/skills/zenray-houdini/scripts/height/HarmoniseBaseColor.py board <dossier> <panneau.png> a1.png a2.png a3.png --steps flat_poly,white_balance,exposure`. (4 November 2026)
+
+
+
+## Prompt base color flat final (3 November 2026, 20:49 +0100), validé par Matthieu le 3 November 2026, 20:52 +0100
+
+Chaîne : référence découpée et éclairée (`textures/panels/zorah-0N-panel.png`), prompt height final, nouvelle height, ZenRay Height, height finale (`FINAL_height.png`). Ce prompt donne alors la base color flat. Ensuite, la base color flat et la height finale repartent ensemble dans Houdini (`HeightToBaseColor.py`) pour la vraie base color.
+
+Joindre deux images, dans cet ordre : la référence découpée, puis la height finale.
+
+```text
+Fais la base color flat de la première image, calée sur la seconde image (la height finale) : même cadrage, chaque détail exactement à la même place, pixel pour pixel. Couleur de la matière seulement. Sans lumière, sans ombre, sans relief. then redo with 99.9% precision in the composition.
+N'utilise pas la génération d'image. En Python, calcule la base color flat de la première image : retire l'éclairage de grande échelle en gardant les couleurs, même taille et même cadrage que la seconde image, PNG 8 bits. then redo with 99.9% precision in the composition.
+```
+
+## Proposition (3 November 2026, 20:46 +0100), remplacée par la proposition 2, trop complexe
+
+Même structure que le prompt height final du 3 November 2026, 19:56 +0100 : un paragraphe de génération, puis un paragraphe Python, envoyés ensemble dans un seul message. Joindre deux images, dans cet ordre : la référence couleur découpée (`Sources/artstation-eRZ01X/textures/panels/zorah-0N-panel.png`, éclairée), puis la height finale sortie de ZenRay Height (`versions/final/<Nom>_H2/FINAL_height.png`, 2048 px).
+
+```text
+Fais la base color (albédo) de la première image : même cadrage que la seconde image, la height finale, chaque détail exactement à la même place, pixel pour pixel. La première image est éclairée par un spot : n'en garde que la couleur propre de la matière, comme sous une lumière parfaitement uniforme. Sans lumière, sans ombre, sans reflet, sans relief. then redo with 99.9% precision in the composition.
+N'utilise pas la génération d'image. En Python, calcule la base color de la première image à la taille de la seconde : divise les trois canaux par la luminosité très floutée, puis remets la couleur moyenne, pour retirer le spot ; ensuite retire l'ombrage du relief en soustrayant la part de la luminosité expliquée par les pentes de la seconde image, la height ; PNG 8 bits sRGB. then redo with 99.9% precision in the composition.
+```
+
+La sortie sert de référence mesurée à `HeightToBaseColor.py`, qui reconstruit la couleur sur la height dans le graphe, raccord compris.
+
+## Ancien prompt (flat base color du skill zenray-houdini), pour comparaison
+
+`templates/zenray-height-basecolor/prompt_flat_basecolor.md` : génération d'image seule, en anglais, qui repeint la couleur en suivant la height.
+
+## Version en quatre étapes dans un seul message (3 November 2026, 23:27 +0100), À TESTER
+
+**VALIDÉE (3 November 2026, 23:52 +0100)** par Matthieu : « il fonctionne très bien ». Source de vérité : `/Users/zenray/.claude/skills/zenray-houdini/templates/zenray-height-basecolor/prompt_basecolor_chain.md`.
+
+Demande de Matthieu : même forme que le prompt height en quatre étapes, avec Python et génération dans la boucle. Joindre deux images, dans cet ordre : le panneau de référence découpé (`Sources/artstation-eRZ01X/textures/panels/zorah-0N-panel.png`), puis la height finale de Houdini (`FINAL_height.png` de ZenRay Height).
+
+```text
+Respecte absolument l'ordre de ce prompt, une étape après l'autre. Image 1 = la référence en couleur, éclairée. Image 2 = la height finale de la même surface.
+
+Étape 1. Fais la base color flat de l'image 1, calée sur l'image 2 : même cadrage, chaque détail exactement à la même place que sur la height, pixel pour pixel. Couleur de la matière seulement. Sans lumière, sans ombre, sans relief. then redo with 99.9% precision in the composition.
+Pour cette étape, n'utilise pas la génération d'image. En Python, calcule la base color flat de l'image 1 : retire l'éclairage de grande échelle par un filtre passe-haut sur la luminance, en gardant les couleurs, même taille et même cadrage que l'image 2, PNG 8 bits. then redo with 99.9% precision in the composition.
+
+Étape 2, seulement une fois la base color de l'étape 1 obtenue. With AI gen create image : corrige les défauts d'éclairage de cette base color (ombres, reflets, relief éclairé, taches de lumière), sans rien changer d'autre ; chaque détail de couleur reste à la place de son relief sur l'image 2.
+
+Étape 3, seulement une fois l'image de l'étape 2 obtenue. En Python, pars de l'image de l'étape 2 et ajuste seulement ses couleurs (teinte moyenne, saturation, luminosité, contraste) sur celles de la base color de l'étape 1. Le but de Python est de ne pas reproduire le problème d'éclairage de l'étape 1 : de l'étape 1, ne reprends que ses couleurs et leur répartition, jamais ses pixels, ses ombres ni sa lumière. Les détails de l'étape 2 restent tels quels. Même taille que l'image 2, PNG 8 bits. then redo with 99.9% precision in the composition.
+
+Étape 4, seulement une fois l'image de l'étape 3 obtenue. En Python, sur cette image seulement : retire le fond d'éclairage restant par soustraction de fond façon rolling ball sur la luminance seulement, la boule roulant par le haut, sur la surface, pour que les fissures et les creux restent sombres et ne soient jamais pris pour le fond ; la teinte et la saturation restent telles quelles. Même taille, PNG 8 bits. then redo with 99.9% precision in the composition.
+```
+
+Ensuite : la base color de l'étape 4 et la height finale repartent dans Houdini (`scripts/height/HeightToBaseColor.py`, `Copernicus2.md` section 14.8).
+
+## Version 2 en quatre étapes (3 November 2026, 23:58 +0100), À TESTER : étape 4 en champ plat et transfert Reinhard (V2 du banc)
+
+Demande de Matthieu : retenir la V2 du banc d'harmonisation (champ plat sur la luminance puis transfert de couleur Reinhard), qui gardait 99,5 % des teintes des blocs, alors que la rolling ball n'en gardait que 76 %. Seule l'étape 4 change par rapport à la version validée de 23:27.
+
+```text
+Respecte absolument l'ordre de ce prompt, une étape après l'autre. Image 1 = la référence en couleur, éclairée. Image 2 = la height finale de la même surface.
+
+Étape 1. Fais la base color flat de l'image 1, calée sur l'image 2 : même cadrage, chaque détail exactement à la même place que sur la height, pixel pour pixel. Couleur de la matière seulement. Sans lumière, sans ombre, sans relief. then redo with 99.9% precision in the composition.
+Pour cette étape, n'utilise pas la génération d'image. En Python, calcule la base color flat de l'image 1 : retire l'éclairage de grande échelle par un filtre passe-haut sur la luminance, en gardant les couleurs, même taille et même cadrage que l'image 2, PNG 8 bits. then redo with 99.9% precision in the composition.
+
+Étape 2, seulement une fois la base color de l'étape 1 obtenue. With AI gen create image : corrige les défauts d'éclairage de cette base color (ombres, reflets, relief éclairé, taches de lumière), sans rien changer d'autre ; chaque détail de couleur reste à la place de son relief sur l'image 2.
+
+Étape 3, seulement une fois l'image de l'étape 2 obtenue. En Python, pars de l'image de l'étape 2 et ajuste seulement ses couleurs (teinte moyenne, saturation, luminosité, contraste) sur celles de la base color de l'étape 1. Le but de Python est de ne pas reproduire le problème d'éclairage de l'étape 1 : de l'étape 1, ne reprends que ses couleurs et leur répartition, jamais ses pixels, ses ombres ni sa lumière. Les détails de l'étape 2 restent tels quels. Même taille que l'image 2, PNG 8 bits. then redo with 99.9% precision in the composition.
+
+Étape 4, seulement une fois l'image de l'étape 3 obtenue. En Python, sur cette image seulement : d'abord une correction de champ plat (flat field) sur la luminance, c'est-à-dire la luminance divisée par son flou très large, pour retirer la lumière qui varie à l'échelle de toute l'image tout en gardant les différences de teinte entre les blocs ou les pierres ; puis un transfert de couleur Reinhard en Lab vers les couleurs moyennes et leur écart de l'étape 1, sans jamais reprendre ses pixels. Même taille, PNG 8 bits. then redo with 99.9% precision in the composition.
+```
+
+## Version 3 en quatre étapes (4 November 2026, 00:12 +0100), ABANDONNÉE (valeur absolue, refusée par Matthieu) : étape 4 avec un calage d'exposition sur l'albédo PBR
+
+Constat de Matthieu sur la version 2 : couleurs justes, mais base color trop sombre, et luminosité différente d'une génération à l'autre. Mesuré sur ses trois générations : moyennes 99, 99 et 140 sRGB, écart entre générations 29,3. Calées en lumière linéaire sur un même albédo, l'écart tombe à 5,7 (116), 6,5 (135) et 7,6 (160), teinte gardée (`Analysis/basecolor-exposure-4-November-2026/`). Repères PBR : non-métal entre 50 et 243 sRGB ; grès vers 116 ; béton vieilli de 122 à 147. La valeur 135 est un réglage à changer par matériau. Seule l'étape 4 change par rapport à la version 2.
+
+```text
+Étape 4, seulement une fois l'image de l'étape 3 obtenue. En Python, sur cette image seulement : d'abord une correction de champ plat (flat field) sur la luminance, c'est-à-dire la luminance divisée par son flou très large, pour retirer la lumière qui varie à l'échelle de toute l'image tout en gardant les différences de teinte entre les blocs ou les pierres ; puis un transfert de couleur Reinhard en Lab vers les teintes et la saturation de l'étape 1, sans jamais reprendre ses pixels ; enfin, cale l'exposition sur l'étalon PBR, et non sur la lumière de la référence : en lumière linéaire, multiplie les trois canaux par un même facteur pour que la luminosité moyenne de la matière vaille 135 en sRGB (albédo PBR d'une pierre ; règle PBR : un non-métal reste entre 50 et 243 en sRGB), sans changer la teinte ni la saturation. Même taille, PNG 8 bits. then redo with 99.9% precision in the composition.
+```
+
+## Version 4 en quatre étapes (4 November 2026, 00:16 +0100), CHOISIE par Matthieu (M4) le 4 November 2026, 00:27 +0100 : étape 4 avec l'exposition Retinex à la lumière principale de la référence
+
+Vainqueur du tournoi de huit méthodes dynamiques (`Analysis/brightness-tournament-4-November-2026/TOURNAMENT.md`) : la cible se mesure sur la référence, jamais une valeur absolue. Sur les trois générations de Matthieu : moyennes 99, 99 et 140 sRGB, puis 138,5 pour les trois ; écart entre générations 29,3 puis 6,7 ; contraste gardé. Seule l'étape 4 change par rapport à la version 2.
+
+```text
+Étape 4, seulement une fois l'image de l'étape 3 obtenue. En Python, sur cette image seulement : d'abord une correction de champ plat (flat field) sur la luminance, c'est-à-dire la luminance divisée par son flou très large, pour retirer la lumière qui varie à l'échelle de toute l'image tout en gardant les différences de teinte entre les blocs ou les pierres ; puis un transfert de couleur Reinhard en Lab vers les teintes et la saturation de l'étape 1, sans jamais reprendre ses pixels ; enfin, cale l'exposition à la façon Retinex, sur la référence et jamais sur une valeur fixe : sépare l'image 1 en réflectance et illumination (sa luminance divisée par son flou très large), puis, en lumière linéaire, multiplie les trois canaux par un même facteur pour que la luminosité moyenne de la base color égale la réflectance moyenne de l'image 1 exposée à sa lumière principale, c'est-à-dire au niveau de ses zones les mieux éclairées (haut percentile de l'illumination) ; la teinte et la saturation ne changent pas. Même taille, PNG 8 bits. then redo with 99.9% precision in the composition.
+```
+
+## Étape 4 simplifiée (4 November 2026, 00:31 +0100), CHOISIE par Matthieu
+
+Concepts seulement, sans détail de matériau ni calcul ; source de vérité : `/Users/zenray/.claude/skills/zenray-houdini/templates/zenray-height-basecolor/prompt_basecolor_chain.md`.
+
+```text
+Étape 4, seulement une fois l'image de l'étape 3 obtenue. En Python, sur cette image seulement : correction de champ plat (flat field), puis transfert de couleur Reinhard (Lab) vers l'étape 1, puis exposition Retinex sur la lumière principale de l'image 1. Même taille, PNG 8 bits. then redo with 99.9% precision in the composition.
+```
+
+## Version détaillée, SOURCE DE VÉRITÉ (4 November 2026, 00:53 +0100)
+
+Les générations d1, d2 et c3 (détaillées) battent c1 et c2 (simplifiées) : écart brut 11,5 contre 32,6. Texte complet : `/Users/zenray/.claude/skills/zenray-houdini/templates/zenray-height-basecolor/prompt_basecolor_chain.md`.

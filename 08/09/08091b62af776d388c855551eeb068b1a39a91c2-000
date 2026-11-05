@@ -1,0 +1,117 @@
+# 4 November 2026, 02:50 : de-lighting tournament, round 3, on the two methods Matthieu kept : M02 (polynomial surface) and M13
+# (shadow regions relit). FR : troisième tour, sur M02 et M13 retenues par Matthieu.
+# Eight variants, four phases each, bracket 8 -> 4 -> 2 -> 1 on the round 2 bench (sharp cast shadow bands, known truth).
+# On the real panel each variant also gets "light left" : correlation of its broad luminance with the panel broad luminance
+# (lower = less of the panel light kept ; the block tints keep it above zero).
+# Usage : python -I DelightTournament3.py <panel.png> <height16.png> <albedo.png> <out_dir>
+import json
+import os
+import sys
+import time
+
+import numpy as np
+from PIL import Image
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import DelightTournament as T  # noqa: E402
+import DelightTournament2 as T2  # noqa: E402
+
+V = {"matte_width": 0.35, "stone_pit_k": 1.5}
+
+
+def stone_mask(ctx):
+    return ~ctx["joints"]
+
+
+def illum(z, s, kind):
+    return T.bilateral_low(z, s * 4, 0.25) if kind == "bilateral" else T.blur(z, s)
+
+
+def relight(z, s, levels=2, kind="gauss", width=None):
+    # shadow regions found on the smoothed luminance, each step of light measured between the regions and given back (luminance only)
+    I = illum(z, s, kind); w = I.std() * (width or V["matte_width"])
+    th = [np.percentile(I, 100.0 * k / levels) for k in range(1, levels)]
+    edges = [-np.inf] + th + [np.inf]
+    means = [I[(I > a) & (I <= b)].mean() for a, b in zip(edges[:-1], edges[1:])]
+    J = np.zeros_like(I)
+    for k, t in enumerate(th):
+        J += (means[k + 1] - means[k]) * (1 / (1 + np.exp(-(I - t) / max(w, 1e-6))))
+    return z - J
+
+
+def surface(z, ctx, deg, masked):
+    return T.poly_surface(z, int(deg), stone_mask(ctx) if masked else None)
+
+
+def r01(z, ctx, s): return surface(z, ctx, s, False)
+def r02(z, ctx, s): return surface(z, ctx, s, True)
+def r03(z, ctx, s):
+    rl = relight(z, s); return z - rl + T.poly_surface(rl, 2)
+def r04(z, ctx, s):
+    rl = relight(z, s, kind="bilateral"); return z - rl + T.poly_surface(rl, 2)
+def r05(z, ctx, s):
+    rl = relight(z, s, levels=3); return z - rl + T.poly_surface(rl, 2)
+def r06(z, ctx, s):
+    a = surface(z, ctx, 3, True); za = z - a; rl = relight(za, s); return z - rl + T.poly_surface(rl, 2)
+def r07(z, ctx, s):
+    rl = relight(z, s); return z - rl + surface(rl, ctx, 3, True)
+def r08(z, ctx, s):
+    rl = relight(z, s, width=0.25); return z - rl + surface(rl, ctx, 3, True)
+
+
+VARIANTS = [
+    ("R01", "M02 surface polynomiale (référence)", r01, [2, 3, 4, 6]),
+    ("R02", "M02 surface ajustée sur la pierre seule", r02, [2, 3, 4, 6]),
+    ("R03", "M13 régions d'ombre (référence)", r03, [24, 16, 12, 8]),
+    ("R04", "M13, ombre trouvée par un bilatéral", r04, [24, 16, 12, 8]),
+    ("R05", "M13 à trois niveaux de lumière", r05, [24, 16, 12, 8]),
+    ("R06", "M02 sur la pierre puis M13", r06, [24, 16, 12, 8]),
+    ("R07", "M13 puis M02 sur la pierre", r07, [24, 16, 12, 8]),
+    ("R08", "M13 au masque plus net puis M02 sur la pierre", r08, [24, 16, 12, 8]),
+]
+
+
+def light_left(out, panel):
+    a, b = np.log(T.lum(out)), np.log(T.lum(panel))
+    return round(float(np.corrcoef(T.blur(a, 12).ravel(), T.blur(b, 12).ravel())[0, 1]), 4)
+
+
+def main(argv):
+    panel_p, h_p, alb_p, out = argv[:4]
+    panel, h, albedo = T.load_rgb(panel_p), T.load_h(h_p), T.load_rgb(alb_p)
+    nrm = T.normals(h); joints = T2.joints_from_height(h)
+    k = T.build_bench(panel, h, albedo)[2]
+    S = T2.analytic_light(T.N) + k[0] * nrm[..., 0] + k[1] * nrm[..., 1]
+    lit = albedo * np.exp(S - S.mean())[..., None]
+    ctx = {"n": nrm, "joints": joints, "chroma": T.chroma(lit)}
+    ctx_r = {"n": nrm, "joints": joints, "chroma": T.chroma(panel)}
+    print("verifier", T.scores(albedo, albedo)["score"], T.scores(lit, albedo)["score"], "panel light left of itself", light_left(panel, panel))
+    res = {}
+    for code, name, fn, phases in VARIANTS:
+        t0 = time.time(); ph = []
+        for s in phases:
+            sc = T.scores(T.apply(lit, ctx, fn, s), albedo)
+            sc["light_left_real"] = light_left(T.apply(panel, ctx_r, fn, s), panel)
+            ph.append({"param": s, **sc})
+        best = max(ph, key=lambda q: q["score"]); res[code] = {"name": name, "phases": ph, "best": best, "seconds": round(time.time() - t0, 1)}
+        print(code, name, "best", best["param"], "banc", best["score"], "fine", best["fine"], "broad", best["broad"], "lumière restante (vrai)", best["light_left_real"], flush=True)
+    alive, rnd, bracket = [v[0] for v in VARIANTS], 1, []
+    while len(alive) > 1:
+        nxt = []
+        for a, b in zip(alive[0::2], alive[1::2]):
+            sa, sb = res[a]["best"]["score"], res[b]["best"]["score"]; w = a if sa >= sb else b
+            bracket.append({"round": rnd, "a": a, "b": b, "score_a": sa, "score_b": sb, "winner": w}); nxt.append(w)
+        alive, rnd = nxt, rnd + 1
+    tiles, labels = [panel], ["panneau (entrée)"]
+    for code, name, fn, phases in VARIANTS:
+        s = res[code]["best"]["param"]; o = T.expose_like(T.apply(panel, ctx_r, fn, s), panel)
+        Image.fromarray((T.to_srgb(o) * 255).astype(np.uint8)).save(f"{out}/real3_{code}.png")
+        tiles.append(o); labels.append(f"{code} {name}\nparam {s}  banc {res[code]['best']['score']}  lumière {res[code]['best']['light_left_real']}")
+    T.board(tiles, f"{out}/sheet3_real_panel.png", labels, n_cols=3, c=560)
+    json.dump({"variants": res, "bracket": bracket, "winner": alive[0]}, open(f"{out}/tournament3.json", "w"), indent=1, ensure_ascii=False)
+    print("winner", alive[0]); [print(b) for b in bracket]
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,0 +1,63 @@
+# Règle : un diagramme SVG simple pour chaque chaîne de valeur et chaque synthèse HTML (3 November 2026)
+
+Mots de Matthieu, grammaire seule : « Pour toutes les chaînes de valeur et pour tous les documents HTML de synthèse, on devrait faire à chaque fois un diagramme SVG très simple qui récapitule tout ce qu'on a fait. »
+
+Quatre emplacements, dans cet ordre. Chaque bloc se colle tel quel, sans retouche : chaque ligne porte déjà sa date. Tous les fichiers visés sont en append only : on ajoute, on ne réécrit rien.
+
+## 1. `/Users/zenray/.claude/CLAUDE.md` : une seule ligne de pointeur
+
+Emplacement : section `## PRIORITÉ 0 : synthèse HTML visuelle et horodatée (1 November 2026)`, nouvelle puce placée après la dernière puce de cette section, juste avant la ligne vide qui précède `## PRIORITÉ N°1 : blocage de l’IA (30 October 2026)`.
+
+[pointer]: #
+
+```markdown
+- Chaque chaîne de valeur et chaque synthèse HTML porte un diagramme SVG très simple qui récapitule tout ce qui a été fait ; règle complète : `/Users/zenray/.claude/rules/ZenRayProjects1.md`, section du 3 November 2026. (3 November 2026)
+```
+
+Poids : la ligne et son retour à la ligne font 246 octets en UTF-8 ; `CLAUDE.md` passe de 64 823 à 65 069 octets, sous la limite de 65 536 (467 octets de marge). Contrôle : `BuildSynthesis.py verify`, ligne « CLAUDE.md stays under 65536 bytes ».
+
+## 2. `/Users/zenray/.claude/rules/ZenRayProjects1.md` : la règle complète
+
+Pourquoi ce fichier : le catalogue de `CLAUDE.md` le donne pour les chantiers, et les règles Assets des projets y vivent déjà (section du 2 October 2026). La session cloud n'a pas lu ce fichier, absent du handoff : si la session locale trouve la règle des synthèses HTML dans `SkillsAndMemory1.md` plutôt qu'ici, la même section va dans `SkillsAndMemory1.md` et seul le nom de fichier du pointeur change.
+
+Emplacement : fin du fichier, après la dernière section, précédée d'une ligne vide.
+
+```markdown
+## Diagramme SVG de chaque chaîne de valeur et de chaque synthèse HTML (3 November 2026)
+
+- Mots de Matthieu, grammaire seule : « Pour toutes les chaînes de valeur et pour tous les documents HTML de synthèse, on devrait faire à chaque fois un diagramme SVG très simple qui récapitule tout ce qu'on a fait. » (3 November 2026)
+- Règle : toute chaîne de valeur consignée, dans un skill, une règle, un prompt ou un projet, et toute synthèse HTML de projet s'accompagnent d'un diagramme SVG très simple qui récapitule tout ce qui a été fait. (3 November 2026)
+- Forme : une entrée, les étapes dans l'ordre, une sortie ; une boîte par étape avec son outil et son chiffre mesuré ; les voies essayées puis écartées à côté, en pointillé et plus discrètes, avec leur verdict. Rien d'autre. (3 November 2026)
+- Style : GT Ultra Regular 400 pour les titres, les nombres et les libellés, Literata 400 pour le texte ; lisible en clair et en sombre ; aucun script ni aucune ressource distante. (3 November 2026)
+- Place : dans une synthèse HTML, le SVG est inline juste après le résumé ; une chaîne consignée dans un skill ou une règle pointe vers un fichier `.svg` posé à côté de sa source. (3 November 2026)
+- Vérité : chaque chiffre du schéma vient d'une mesure ou d'un fichier cité ; ce qui n'est pas mesuré s'écrit « non mesuré » ; si l'ordre du schéma est logique et non chronologique, la légende le dit. (3 November 2026)
+- Contrôle : le SVG s'ouvre seul, ses textes restent dans leurs boîtes, mesurés dans un navigateur isolé, et un script recalcule ses chiffres depuis les fichiers sources, vert sur le vrai et rouge sur une copie cassée. (3 November 2026)
+- Premier exemple : la chaîne height et base color de Zorah, `/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/value-chain.svg`, sa synthèse `Synthesis.html` et son vérificateur `build/BuildSynthesis.py verify`. (3 November 2026)
+```
+
+## 3. `/Users/zenray/.claude/skills/zenray-edit/references/ProjectSynthesis.md` : le contrat
+
+Emplacement : fin du fichier, après la section `## État vérifié lors de la consignation (1 November 2026)`, précédée d'une ligne vide. Puis synchronisation du skill zenray-edit (voir `APPLY.md`).
+
+```markdown
+## Diagramme SVG récapitulatif (3 November 2026)
+
+- Demande de Matthieu, grammaire seule : « Pour toutes les chaînes de valeur et pour tous les documents HTML de synthèse, on devrait faire à chaque fois un diagramme SVG très simple qui récapitule tout ce qu'on a fait. » (3 November 2026)
+- Toute synthèse porte, juste après le résumé, un diagramme SVG inline très simple qui récapitule tout ce qui a été fait : l'entrée, les étapes dans l'ordre avec leur outil et leur chiffre mesuré, la sortie ; les voies écartées à côté, en pointillé, avec leur verdict. Il résume les figures de preuve, il ne les remplace pas. (3 November 2026)
+- Le diagramme suit la typographie globale, GT Ultra Regular 400 pour les titres, les nombres et les libellés, Literata 400 pour le texte, sans script ni ressource distante, lisible en clair et en sombre ; sur petit écran, son cadre défile en largeur sans que la page déborde. (3 November 2026)
+- Le même diagramme existe en fichier autonome `value-chain.svg` à côté de la synthèse, polices embarquées, pour être relu ou réutilisé seul. (3 November 2026)
+- Ses chiffres viennent des fichiers de mesure du projet ; ce qui n'est pas mesuré s'écrit « non mesuré » ; quand l'ordre est logique et non chronologique, la légende le dit. (3 November 2026)
+- Vérification avant de déclarer terminé : les textes du diagramme restent dans leurs boîtes, mesurés dans un navigateur isolé à grande et à petite largeur, et un script recalcule ses chiffres depuis les sources. Exemple de référence : `/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/build/BuildSynthesis.py`, commandes `verify` et `selftest`. (3 November 2026)
+```
+
+## 4. `/Users/zenray/.claude/skills/zenray-houdini/templates/zenray-height-from-map/prompt_height_chain.md` : la chaîne existante reçoit son SVG
+
+C'est la règle « Place » appliquée à la chaîne du jour : `value-chain.svg` est copié dans ce même dossier (voir `APPLY.md`), et cette section pointe vers lui.
+
+Emplacement : fin du fichier, après la section `## Règles d'écriture qui le rendent robuste (3 November 2026, 22:47 +0100)`, précédée d'une ligne vide. Puis synchronisation du skill zenray-houdini.
+
+```markdown
+## Diagramme de la chaîne de valeur (3 November 2026)
+
+- Diagramme SVG de la chaîne height et base color de Zorah, du panneau éclairé à la height finale puis aux cinq cartes, avec les voies écartées : `value-chain.svg`, dans ce dossier. Synthèse complète : `/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026/Articles/Synthesis.html`. (3 November 2026)
+```

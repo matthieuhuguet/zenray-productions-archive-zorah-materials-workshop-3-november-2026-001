@@ -1,0 +1,62 @@
+# 3 November 2026, 23:24 : compare extra filters after the rolling ball from above, on three generations of the same map.
+# FR : compare des filtres ajoutés après la rolling ball par le haut, sur trois générations de la même map.
+import itertools
+import json
+import sys
+
+import numpy as np
+
+sys.path.insert(0, "/Users/zenray/.claude/skills/zenray-houdini/scripts/height")
+import RollingBallTop as R  # noqa: E402
+
+
+def local_contrast(a, s):
+    m = R.gblur(a, s)
+    d = a - m
+    sd = np.sqrt(np.maximum(R.gblur(d * d, s), 1e-8))
+    return d / sd
+
+
+def hist_to_normal(a):
+    # rank -> standard normal quantile : every input ends with the same value distribution
+    from scipy.special import ndtri
+    r = a.ravel().argsort().argsort().astype(np.float64)
+    q = (r + 0.5) / r.size
+    return ndtri(q).reshape(a.shape)
+
+
+def variant(a, name):
+    w = a.shape[1]
+    if name == "V0 rolling ball":
+        return R.uniformise(a)
+    if name == "V1 boule 1/64":
+        return R.uniformise(a, {"radius": 1 / 64, "smooth": 1 / 128})
+    base = R.uniformise(a, {"radius": 1 / 64, "smooth": 1 / 128}) if "1/64" in name else R.uniformise(a)
+    out = base
+    if "contraste local" in name:
+        out = local_contrast(out, w / 32)
+    if "histo" in name:
+        out = hist_to_normal(out)
+    if "flou 1px" in name:
+        out = R.gblur(out, w / 2048)
+    return R.levels(out, R.P)
+
+
+def main(paths):
+    ins = [R.load(p) for p in paths]
+    names = ["V0 rolling ball", "V1 boule 1/64", "V2 contraste local", "V3 contraste local + histo",
+             "V4 1/64 + contraste local + histo", "V5 1/64 + contraste local + histo + flou 1px"]
+    rep = {}
+    for n in names:
+        outs = [variant(a, n) for a in ins]
+        pairs = [R.corr(x, y) for x, y in itertools.combinations(outs, 2)]
+        keep = [R.corr(R.levels(a, R.P) - R.gblur(R.levels(a, R.P), a.shape[1] / 128), o - R.gblur(o, o.shape[1] / 128)) for a, o in zip(ins, outs)]
+        rep[n] = {"pairs_mean": round(float(np.mean(pairs)), 4), "pairs": [round(p, 4) for p in pairs], "shading": [round(R.shading(o), 3) for o in outs],
+                  "fine_detail_kept": [round(k, 3) for k in keep]}
+        np.save(f"/private/tmp/claude-501/uv_{n.split()[0]}.npy", np.stack(outs)) if False else None
+        print(n, rep[n], flush=True)
+    json.dump(rep, open(sys.argv[1], "w"), indent=1)
+
+
+if __name__ == "__main__":
+    main(sys.argv[2:])

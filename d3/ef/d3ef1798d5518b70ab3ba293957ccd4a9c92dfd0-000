@@ -1,0 +1,115 @@
+# 3 November 2026, 17:40 : builds the Zorah credit band as one standalone HTML file.
+# FR : construit la bande de crédit Zorah en un seul fichier HTML autonome, police et logo intégrés.
+import base64
+import json
+import pathlib
+import re
+
+ROOT = pathlib.Path("/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026")
+FONT = pathlib.Path("/Users/zenray/.claude/skills/zenray-edit/designs/_shared/fonts/GT-Ultra-Regular.woff2")
+ARTWORK = ROOT / "Sources" / "artstation-eRZ01X" / "artwork.json"
+LOGO = pathlib.Path("/Users/zenray/Create/Build/Productions/GithubProductions/ZenRayWebsite/public/ZenRayLogoSvgWhite.svg")
+OUT = ROOT / "Bands" / "zorah-band.html"
+
+# One place for every value. Sizes are in cqw, a percentage of the page width.
+# FR : une seule place pour chaque valeur. Les tailles sont en cqw, pourcentage de la largeur de page.
+TOKENS = {
+    "--band-bg": "#000000",
+    "--band-h": "3.984cqw",   # 153 px on a 3840 px wide frame, measured on zorah-01
+    "--pad-x": "5cqw",        # side margin, measured on zorah-01
+    "--mark-h": "2cqw",
+    "--type-size": "1.45cqw",
+    "--gap": "0.9cqw",
+    "--slash-gap": "0.7cqw",
+    "--logo-grey": "#d0d0d0",
+    "--text-grey": "#9a9a9a",
+}
+
+CSS = """
+@font-face {
+  font-family: 'GT Ultra';
+  src: url(data:font/woff2;base64,__FONT__) format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+:root {
+__TOKENS__
+}
+html, body { margin: 0; background: var(--band-bg); }
+.page { container-type: inline-size; width: 100%; }
+.band {
+  box-sizing: border-box;
+  height: var(--band-h);
+  padding: 0 var(--pad-x);
+  background: var(--band-bg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'GT Ultra', sans-serif;
+  font-weight: 400;
+  font-size: var(--type-size);
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--text-grey);
+}
+.left, .right { display: flex; align-items: center; }
+.mark { width: var(--mark-h); height: var(--mark-h); display: block; }
+.mark rect { fill: var(--band-bg); }
+.mark .cls-1 { fill: var(--logo-grey); }
+.wordmark { color: var(--logo-grey); text-transform: uppercase; letter-spacing: 0.02em; margin-left: var(--gap); }
+.sep { margin: 0 var(--slash-gap); }
+.author, .project { color: var(--text-grey); }
+"""
+
+
+def inline_logo(svg):
+    # Keep the two shapes, drop the title and the defs block, and mark the root for CSS.
+    # FR : garder les deux formes, retirer le titre et le bloc defs, marquer la racine pour le CSS.
+    svg = re.sub(r"<title>.*?</title>", "", svg, flags=re.S)
+    svg = re.sub(r"<defs>.*?</defs>", "", svg, flags=re.S)
+    return svg.replace("<svg ", '<svg class="mark" role="img" aria-label="ZenRay" ', 1).strip()
+
+
+def main():
+    font_b64 = base64.b64encode(FONT.read_bytes()).decode("ascii")
+    token_lines = "\n".join(f"  {name}: {value};" for name, value in TOKENS.items())
+    css = CSS.replace("__FONT__", font_b64).replace("__TOKENS__", token_lines)
+    svg = inline_logo(LOGO.read_text(encoding="utf-8"))
+    # The work title comes from the captured artwork file, its first part before " - ".
+    # FR : le titre de l'œuvre vient du fichier capturé, sa première partie avant « - ».
+    work = json.loads(ARTWORK.read_text(encoding="utf-8"))["title"].split(" - ")[0].strip()
+    project_name = work + " Project Study"
+    body = (
+        '<div class="page">\n'
+        '  <footer class="band">\n'
+        '    <div class="left">\n'
+        f"      {svg}\n"
+        '      <span class="wordmark">ZenRay</span>\n'
+        '      <span class="sep">|</span>\n'
+        '      <span class="author">Matthieu Huguet</span>\n'
+        "    </div>\n"
+        '    <div class="right">\n'
+        '      <span class="project">' + project_name + '</span>\n'
+        "    </div>\n"
+        "  </footer>\n"
+        "</div>"
+    )
+    html = (
+        "<!doctype html>\n"
+        '<html lang="en">\n<head>\n'
+        '<meta charset="utf-8">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        "<title>" + project_name + ", credit band</title>\n"
+        f"<style>{css}</style>\n"
+        "</head>\n<body>\n"
+        f"{body}\n"
+        "</body>\n</html>\n"
+    )
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(html, encoding="utf-8")
+    print(OUT, len(html.encode("utf-8")), "bytes")
+
+
+if __name__ == "__main__":
+    main()

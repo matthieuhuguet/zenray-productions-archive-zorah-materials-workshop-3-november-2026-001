@@ -1,0 +1,40 @@
+# 3 November 2026, 19:41 : crops the flat square panel of each Zorah sheet, without the cylinder or the band.
+# FR : découpe le carré plat de chaque planche Zorah, sans le cylindre ni le bandeau.
+import pathlib
+
+import numpy as np
+from PIL import Image
+
+ROOT = pathlib.Path("/Users/zenray/.claude/tmp/tmp-zorah-materials-3-november-2026")
+SRC = ROOT / "Sources/artstation-eRZ01X/textures"
+OUT = SRC / "panels"
+P = {"threshold": 0.17, "inset": 0.01}  # panel brighter than the dark background; small inset off the edge
+
+
+def runs(mask):
+    out, start = [], None
+    for i, v in enumerate(np.r_[mask, False]):
+        if v and start is None: start = i
+        if not v and start is not None: out.append((start, i)); start = None
+    return out
+
+
+def main():
+    OUT.mkdir(exist_ok=True)
+    # Every sheet shares one layout, so the frame measured on the brightest sheet (zorah-01) serves all;
+    # dark rust on zorah-06 and zorah-08 fooled a per-sheet threshold.
+    # FR : toutes les planches ont la même mise en page, le cadre mesuré sur zorah-01 sert pour toutes.
+    g = np.asarray(Image.open(SRC / "zorah-01.jpg").convert("RGB"), dtype=np.float64).mean(axis=2) / 255
+    for p in sorted(SRC.glob("zorah-*.jpg")):
+        rgb = Image.open(p).convert("RGB")
+        x0, x1 = max((r for r in runs(g[300:1700].mean(axis=0) > P["threshold"]) if r[1] - r[0] > 1000), key=lambda r: r[0])
+        ys = np.where(g[:, x0:x1].mean(axis=1) > P["threshold"])[0]
+        y0, y1 = ys[0], ys[-1]
+        m = int(P["inset"] * (x1 - x0))
+        crop = rgb.crop((x0 + m, y0 + m, x1 - m, y1 - m))
+        crop.save(OUT / f"{p.stem}-panel.png")
+        print(p.stem, crop.size)
+
+
+if __name__ == "__main__":
+    main()
