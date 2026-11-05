@@ -1,0 +1,90 @@
+{
+ "panel": {
+  "L_mean": 43.4,
+  "chroma_mean": 16.01,
+  "chroma_p95": 23.43,
+  "colour_fine_detail": 1.612,
+  "block_tint_std": 3.952,
+  "shading_left_L_std": 8.98,
+  "L_fine_detail_std": 5.03,
+  "L_fine_corr_panel": 1.0,
+  "L_mid_corr_panel": 1.0
+ },
+ "d2": {
+  "L_mean": 58.6,
+  "chroma_mean": 20.38,
+  "chroma_p95": 27.56,
+  "colour_fine_detail": 2.699,
+  "block_tint_std": 2.499,
+  "shading_left_L_std": 1.27,
+  "L_fine_detail_std": 6.53,
+  "L_fine_corr_panel": 0.32,
+  "L_mid_corr_panel": 0.586
+ },
+ "d1": {
+  "L_mean": 56.6,
+  "chroma_mean": 20.46,
+  "chroma_p95": 30.1,
+  "colour_fine_detail": 3.017,
+  "block_tint_std": 3.6,
+  "shading_left_L_std": 1.64,
+  "L_fine_detail_std": 5.5,
+  "L_fine_corr_panel": 0.324,
+  "L_mid_corr_panel": 0.519
+ },
+ "c3": {
+  "L_mean": 62.8,
+  "chroma_mean": 21.02,
+  "chroma_p95": 27.92,
+  "colour_fine_detail": 1.661,
+  "block_tint_std": 1.939,
+  "shading_left_L_std": 0.55,
+  "L_fine_detail_std": 3.64,
+  "L_fine_corr_panel": 0.305,
+  "L_mid_corr_panel": 0.373
+ },
+ "d2_M4": {
+  "L_mean": 57.3,
+  "chroma_mean": 15.86,
+  "chroma_p95": 22.66,
+  "colour_fine_detail": 2.395,
+  "block_tint_std": 2.162,
+  "shading_left_L_std": 0.45,
+  "L_fine_detail_std": 6.4,
+  "L_fine_corr_panel": 0.317,
+  "L_mid_corr_panel": 0.582
+ },
+ "d2_V4b": {
+  "L_mean": 57.3,
+  "chroma_mean": 19.65,
+  "chroma_p95": 26.69,
+  "colour_fine_detail": 2.673,
+  "block_tint_std": 2.452,
+  "shading_left_L_std": 0.7,
+  "L_fine_detail_std": 6.42,
+  "L_fine_corr_panel": 0.317,
+  "L_mid_corr_panel": 0.568
+ },
+ "d1_V4b": {
+  "L_mean": 57.4,
+  "chroma_mean": 19.78,
+  "chroma_p95": 29.62,
+  "colour_fine_detail": 3.068,
+  "block_tint_std": 3.66,
+  "shading_left_L_std": 0.77,
+  "L_fine_detail_std": 5.57,
+  "L_fine_corr_panel": 0.319,
+  "L_mid_corr_panel": 0.494
+ },
+ "c3_V4b": {
+  "L_mean": 57.7,
+  "chroma_mean": 19.22,
+  "chroma_p95": 25.71,
+  "colour_fine_detail": 1.577,
+  "block_tint_std": 1.817,
+  "shading_left_L_std": 0.18,
+  "L_fine_detail_std": 3.41,
+  "L_fine_corr_panel": 0.303,
+  "L_mid_corr_panel": 0.34
+ }
+}
