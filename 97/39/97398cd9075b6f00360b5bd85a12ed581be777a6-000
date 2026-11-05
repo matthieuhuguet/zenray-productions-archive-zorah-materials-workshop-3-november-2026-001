@@ -1,0 +1,972 @@
+{
+ "light_direction_fit": [
+  0.2794,
+  -0.2962
+ ],
+ "blocks": 29,
+ "check_truth": {
+  "fine": 1.0,
+  "mid": 1.0,
+  "broad": 1.0,
+  "full": 1.0,
+  "chroma_err": 0.0,
+  "score": 1.0
+ },
+ "check_lit_input": {
+  "fine": 0.9907,
+  "mid": 0.9899,
+  "broad": 0.399,
+  "full": 0.566,
+  "chroma_err": 0.0004,
+  "score": 0.6689
+ },
+ "check_inverted": {
+  "fine": -0.9967,
+  "mid": -0.9968,
+  "broad": -0.9939,
+  "full": -0.9963,
+  "chroma_err": 39.5727,
+  "score": -1.3913
+ },
+ "methods": {
+  "M01": {
+   "name": "champ plat (flou)",
+   "phases": [
+    {
+     "param": 128,
+     "fine": 0.9907,
+     "mid": 0.99,
+     "broad": 0.6746,
+     "full": 0.895,
+     "chroma_err": 0.0001,
+     "score": 0.845
+    },
+    {
+     "param": 64,
+     "fine": 0.9907,
+     "mid": 0.9901,
+     "broad": 0.7253,
+     "full": 0.9593,
+     "chroma_err": 0.0001,
+     "score": 0.8781
+    },
+    {
+     "param": 32,
+     "fine": 0.9907,
+     "mid": 0.9902,
+     "broad": 0.668,
+     "full": 0.9549,
+     "chroma_err": 0.0001,
+     "score": 0.8543
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9868,
+     "broad": 0.5644,
+     "full": 0.94,
+     "chroma_err": 0.0001,
+     "score": 0.8092
+    }
+   ],
+   "best": {
+    "param": 64,
+    "fine": 0.9907,
+    "mid": 0.9901,
+    "broad": 0.7253,
+    "full": 0.9593,
+    "chroma_err": 0.0001,
+    "score": 0.8781
+   },
+   "seconds": 1.7
+  },
+  "M02": {
+   "name": "surface polynomiale",
+   "phases": [
+    {
+     "param": 2,
+     "fine": 0.9907,
+     "mid": 0.9896,
+     "broad": 0.7476,
+     "full": 0.8361,
+     "chroma_err": 0.0002,
+     "score": 0.8623
+    },
+    {
+     "param": 3,
+     "fine": 0.9907,
+     "mid": 0.9894,
+     "broad": 0.7387,
+     "full": 0.8586,
+     "chroma_err": 0.0001,
+     "score": 0.8632
+    },
+    {
+     "param": 4,
+     "fine": 0.9907,
+     "mid": 0.989,
+     "broad": 0.5745,
+     "full": 0.9121,
+     "chroma_err": 0.0001,
+     "score": 0.8081
+    },
+    {
+     "param": 6,
+     "fine": 0.9907,
+     "mid": 0.9896,
+     "broad": 0.569,
+     "full": 0.9391,
+     "chroma_err": 0.0001,
+     "score": 0.8115
+    }
+   ],
+   "best": {
+    "param": 3,
+    "fine": 0.9907,
+    "mid": 0.9894,
+    "broad": 0.7387,
+    "full": 0.8586,
+    "chroma_err": 0.0001,
+    "score": 0.8632
+   },
+   "seconds": 1.4
+  },
+  "M03": {
+   "name": "Retinex multi échelle",
+   "phases": [
+    {
+     "param": 128,
+     "fine": 0.9907,
+     "mid": 0.9902,
+     "broad": 0.5409,
+     "full": 0.8405,
+     "chroma_err": 0.0001,
+     "score": 0.7806
+    },
+    {
+     "param": 64,
+     "fine": 0.9907,
+     "mid": 0.9896,
+     "broad": 0.6116,
+     "full": 0.9184,
+     "chroma_err": 0.0001,
+     "score": 0.8244
+    },
+    {
+     "param": 32,
+     "fine": 0.9907,
+     "mid": 0.9861,
+     "broad": 0.7174,
+     "full": 0.9588,
+     "chroma_err": 0.0001,
+     "score": 0.8741
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9774,
+     "broad": 0.7278,
+     "full": 0.9485,
+     "chroma_err": 0.0001,
+     "score": 0.8744
+    }
+   ],
+   "best": {
+    "param": 16,
+    "fine": 0.9907,
+    "mid": 0.9774,
+    "broad": 0.7278,
+    "full": 0.9485,
+    "chroma_err": 0.0001,
+    "score": 0.8744
+   },
+   "seconds": 6.1
+  },
+  "M04": {
+   "name": "bilatéral (bords de lumière gardés)",
+   "phases": [
+    {
+     "param": 64,
+     "fine": 0.9889,
+     "mid": 0.914,
+     "broad": 0.6101,
+     "full": 0.9159,
+     "chroma_err": 0.0001,
+     "score": 0.8078
+    },
+    {
+     "param": 32,
+     "fine": 0.9891,
+     "mid": 0.9291,
+     "broad": 0.5876,
+     "full": 0.9177,
+     "chroma_err": 0.0001,
+     "score": 0.8022
+    },
+    {
+     "param": 16,
+     "fine": 0.9891,
+     "mid": 0.9222,
+     "broad": 0.5108,
+     "full": 0.9086,
+     "chroma_err": 0.0001,
+     "score": 0.7683
+    },
+    {
+     "param": 8,
+     "fine": 0.989,
+     "mid": 0.8897,
+     "broad": 0.4307,
+     "full": 0.8929,
+     "chroma_err": 0.0001,
+     "score": 0.7266
+    }
+   ],
+   "best": {
+    "param": 64,
+    "fine": 0.9889,
+    "mid": 0.914,
+    "broad": 0.6101,
+    "full": 0.9159,
+    "chroma_err": 0.0001,
+    "score": 0.8078
+   },
+   "seconds": 1.1
+  },
+  "M05": {
+   "name": "filtre guidé",
+   "phases": [
+    {
+     "param": 64,
+     "fine": 0.9882,
+     "mid": 0.8346,
+     "broad": 0.5806,
+     "full": 0.8749,
+     "chroma_err": 0.0001,
+     "score": 0.7718
+    },
+    {
+     "param": 32,
+     "fine": 0.9881,
+     "mid": 0.8159,
+     "broad": 0.461,
+     "full": 0.8701,
+     "chroma_err": 0.0001,
+     "score": 0.7192
+    },
+    {
+     "param": 16,
+     "fine": 0.9874,
+     "mid": 0.763,
+     "broad": 0.317,
+     "full": 0.8575,
+     "chroma_err": 0.0001,
+     "score": 0.6484
+    },
+    {
+     "param": 8,
+     "fine": 0.986,
+     "mid": 0.6793,
+     "broad": 0.2136,
+     "full": 0.8396,
+     "chroma_err": 0.0001,
+     "score": 0.5864
+    }
+   ],
+   "best": {
+    "param": 64,
+    "fine": 0.9882,
+    "mid": 0.8346,
+    "broad": 0.5806,
+    "full": 0.8749,
+    "chroma_err": 0.0001,
+    "score": 0.7718
+   },
+   "seconds": 1.2
+  },
+  "M06": {
+   "name": "fermeture (rolling ball haut)",
+   "phases": [
+    {
+     "param": 128,
+     "fine": 0.9907,
+     "mid": 0.9901,
+     "broad": 0.6718,
+     "full": 0.9427,
+     "chroma_err": 0.0001,
+     "score": 0.8534
+    },
+    {
+     "param": 64,
+     "fine": 0.9907,
+     "mid": 0.9903,
+     "broad": 0.6494,
+     "full": 0.9557,
+     "chroma_err": 0.0001,
+     "score": 0.8471
+    },
+    {
+     "param": 32,
+     "fine": 0.9907,
+     "mid": 0.9891,
+     "broad": 0.5607,
+     "full": 0.9469,
+     "chroma_err": 0.0001,
+     "score": 0.8096
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9779,
+     "broad": 0.3867,
+     "full": 0.9317,
+     "chroma_err": 0.0001,
+     "score": 0.7348
+    }
+   ],
+   "best": {
+    "param": 128,
+    "fine": 0.9907,
+    "mid": 0.9901,
+    "broad": 0.6718,
+    "full": 0.9427,
+    "chroma_err": 0.0001,
+    "score": 0.8534
+   },
+   "seconds": 0.9
+  },
+  "M07": {
+   "name": "harmoniques sur normales + polynôme",
+   "phases": [
+    {
+     "param": 64,
+     "fine": 0.919,
+     "mid": 0.9265,
+     "broad": 0.7441,
+     "full": 0.7483,
+     "chroma_err": 0.0002,
+     "score": 0.8164
+    },
+    {
+     "param": 32,
+     "fine": 0.9188,
+     "mid": 0.9262,
+     "broad": 0.7441,
+     "full": 0.7481,
+     "chroma_err": 0.0002,
+     "score": 0.8162
+    },
+    {
+     "param": 16,
+     "fine": 0.9195,
+     "mid": 0.927,
+     "broad": 0.7441,
+     "full": 0.7486,
+     "chroma_err": 0.0002,
+     "score": 0.8167
+    },
+    {
+     "param": 8,
+     "fine": 0.9218,
+     "mid": 0.9295,
+     "broad": 0.7443,
+     "full": 0.7503,
+     "chroma_err": 0.0002,
+     "score": 0.818
+    }
+   ],
+   "best": {
+    "param": 8,
+    "fine": 0.9218,
+    "mid": 0.9295,
+    "broad": 0.7443,
+    "full": 0.7503,
+    "chroma_err": 0.0002,
+    "score": 0.818
+   },
+   "seconds": 1.4
+  },
+  "M08": {
+   "name": "normales locales par tuiles",
+   "phases": [
+    {
+     "param": 4,
+     "fine": 0.9247,
+     "mid": 0.9338,
+     "broad": 0.6265,
+     "full": 0.8094,
+     "chroma_err": 0.0001,
+     "score": 0.7842
+    },
+    {
+     "param": 8,
+     "fine": 0.924,
+     "mid": 0.9311,
+     "broad": 0.6112,
+     "full": 0.8816,
+     "chroma_err": 0.0001,
+     "score": 0.7918
+    },
+    {
+     "param": 16,
+     "fine": 0.9241,
+     "mid": 0.9253,
+     "broad": 0.5106,
+     "full": 0.8762,
+     "chroma_err": 0.0001,
+     "score": 0.7493
+    },
+    {
+     "param": 32,
+     "fine": 0.924,
+     "mid": 0.9148,
+     "broad": 0.357,
+     "full": 0.8601,
+     "chroma_err": 0.0001,
+     "score": 0.6826
+    }
+   ],
+   "best": {
+    "param": 8,
+    "fine": 0.924,
+    "mid": 0.9311,
+    "broad": 0.6112,
+    "full": 0.8816,
+    "chroma_err": 0.0001,
+    "score": 0.7918
+   },
+   "seconds": 1.1
+  },
+  "M09": {
+   "name": "blocs segmentés par la height",
+   "phases": [
+    {
+     "param": 1,
+     "fine": 0.9882,
+     "mid": 0.9478,
+     "broad": 0.3597,
+     "full": 0.6214,
+     "chroma_err": 0.0003,
+     "score": 0.6554
+    },
+    {
+     "param": 2,
+     "fine": 0.9882,
+     "mid": 0.9468,
+     "broad": 0.3335,
+     "full": 0.5817,
+     "chroma_err": 0.0003,
+     "score": 0.6367
+    },
+    {
+     "param": 3,
+     "fine": 0.9882,
+     "mid": 0.9466,
+     "broad": 0.2852,
+     "full": 0.55,
+     "chroma_err": 0.0002,
+     "score": 0.611
+    },
+    {
+     "param": 4,
+     "fine": 0.9882,
+     "mid": 0.9422,
+     "broad": -0.2366,
+     "full": 0.3416,
+     "chroma_err": 0.0016,
+     "score": 0.3597
+    }
+   ],
+   "best": {
+    "param": 1,
+    "fine": 0.9882,
+    "mid": 0.9478,
+    "broad": 0.3597,
+    "full": 0.6214,
+    "chroma_err": 0.0003,
+    "score": 0.6554
+   },
+   "seconds": 1.4
+  },
+  "M10": {
+   "name": "Retinex de Horn (gradients)",
+   "phases": [
+    {
+     "param": 50,
+     "fine": 0.7062,
+     "mid": 0.8727,
+     "broad": 0.1017,
+     "full": 0.0714,
+     "chroma_err": 10.3474,
+     "score": 0.2673
+    },
+    {
+     "param": 70,
+     "fine": 0.7021,
+     "mid": 0.8529,
+     "broad": 0.1321,
+     "full": 0.0944,
+     "chroma_err": 0.8363,
+     "score": 0.3744
+    },
+    {
+     "param": 85,
+     "fine": 0.6641,
+     "mid": 0.7992,
+     "broad": 0.1859,
+     "full": 0.1469,
+     "chroma_err": 0.0109,
+     "score": 0.3963
+    },
+    {
+     "param": 95,
+     "fine": 0.5781,
+     "mid": 0.7136,
+     "broad": 0.1102,
+     "full": 0.1159,
+     "chroma_err": 0.0022,
+     "score": 0.3256
+    }
+   ],
+   "best": {
+    "param": 85,
+    "fine": 0.6641,
+    "mid": 0.7992,
+    "broad": 0.1859,
+    "full": 0.1469,
+    "chroma_err": 0.0109,
+    "score": 0.3963
+   },
+   "seconds": 1.3
+  },
+  "M11": {
+   "name": "normalisation locale du contraste",
+   "phases": [
+    {
+     "param": 128,
+     "fine": 0.9821,
+     "mid": 0.9821,
+     "broad": 0.7003,
+     "full": 0.9094,
+     "chroma_err": 0.0001,
+     "score": 0.8548
+    },
+    {
+     "param": 64,
+     "fine": 0.9831,
+     "mid": 0.9827,
+     "broad": 0.7386,
+     "full": 0.9541,
+     "chroma_err": 0.0001,
+     "score": 0.8794
+    },
+    {
+     "param": 32,
+     "fine": 0.9719,
+     "mid": 0.9694,
+     "broad": 0.6702,
+     "full": 0.9374,
+     "chroma_err": 0.0001,
+     "score": 0.8438
+    },
+    {
+     "param": 16,
+     "fine": 0.9512,
+     "mid": 0.9414,
+     "broad": 0.5497,
+     "full": 0.9005,
+     "chroma_err": 0.0001,
+     "score": 0.7785
+    }
+   ],
+   "best": {
+    "param": 64,
+    "fine": 0.9831,
+    "mid": 0.9827,
+    "broad": 0.7386,
+    "full": 0.9541,
+    "chroma_err": 0.0001,
+    "score": 0.8794
+   },
+   "seconds": 2.6
+  },
+  "M12": {
+   "name": "pyramide à gain local",
+   "phases": [
+    {
+     "param": 4,
+     "fine": 0.9279,
+     "mid": 0.934,
+     "broad": 0.5639,
+     "full": 0.8832,
+     "chroma_err": 0.0001,
+     "score": 0.7746
+    },
+    {
+     "param": 5,
+     "fine": 0.9279,
+     "mid": 0.9377,
+     "broad": 0.6681,
+     "full": 0.8991,
+     "chroma_err": 0.0001,
+     "score": 0.8202
+    },
+    {
+     "param": 6,
+     "fine": 0.9279,
+     "mid": 0.9375,
+     "broad": 0.7335,
+     "full": 0.9061,
+     "chroma_err": 0.0001,
+     "score": 0.8477
+    },
+    {
+     "param": 7,
+     "fine": 0.9279,
+     "mid": 0.9374,
+     "broad": 0.6825,
+     "full": 0.8487,
+     "chroma_err": 0.0001,
+     "score": 0.8158
+    }
+   ],
+   "best": {
+    "param": 6,
+    "fine": 0.9279,
+    "mid": 0.9375,
+    "broad": 0.7335,
+    "full": 0.9061,
+    "chroma_err": 0.0001,
+    "score": 0.8477
+   },
+   "seconds": 10.2
+  },
+  "M13": {
+   "name": "régions d'ombre rééclairées",
+   "phases": [
+    {
+     "param": 48,
+     "fine": 0.9907,
+     "mid": 0.9901,
+     "broad": 0.7312,
+     "full": 0.9218,
+     "chroma_err": 0.0001,
+     "score": 0.873
+    },
+    {
+     "param": 32,
+     "fine": 0.9907,
+     "mid": 0.99,
+     "broad": 0.7134,
+     "full": 0.9246,
+     "chroma_err": 0.0001,
+     "score": 0.8664
+    },
+    {
+     "param": 24,
+     "fine": 0.9907,
+     "mid": 0.9898,
+     "broad": 0.7013,
+     "full": 0.9247,
+     "chroma_err": 0.0001,
+     "score": 0.8616
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9888,
+     "broad": 0.6868,
+     "full": 0.9234,
+     "chroma_err": 0.0001,
+     "score": 0.8553
+    }
+   ],
+   "best": {
+    "param": 48,
+    "fine": 0.9907,
+    "mid": 0.9901,
+    "broad": 0.7312,
+    "full": 0.9218,
+    "chroma_err": 0.0001,
+    "score": 0.873
+   },
+   "seconds": 1.4
+  },
+  "M14": {
+   "name": "gradients guidés par la chromaticité",
+   "phases": [
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9891,
+     "broad": 0.4363,
+     "full": 0.8142,
+     "chroma_err": 0.0001,
+     "score": 0.7333
+    },
+    {
+     "param": 8,
+     "fine": 0.9907,
+     "mid": 0.982,
+     "broad": 0.4105,
+     "full": 0.8085,
+     "chroma_err": 0.0001,
+     "score": 0.7204
+    },
+    {
+     "param": 4,
+     "fine": 0.9906,
+     "mid": 0.9679,
+     "broad": 0.3558,
+     "full": 0.7552,
+     "chroma_err": 0.0002,
+     "score": 0.6851
+    },
+    {
+     "param": 2,
+     "fine": 0.9905,
+     "mid": 0.9629,
+     "broad": 0.2516,
+     "full": 0.5589,
+     "chroma_err": 0.0003,
+     "score": 0.6031
+    }
+   ],
+   "best": {
+    "param": 16,
+    "fine": 0.9907,
+    "mid": 0.9891,
+    "broad": 0.4363,
+    "full": 0.8142,
+    "chroma_err": 0.0001,
+    "score": 0.7333
+   },
+   "seconds": 1.6
+  },
+  "M15": {
+   "name": "filtre de rang (70e percentile)",
+   "phases": [
+    {
+     "param": 128,
+     "fine": 0.9907,
+     "mid": 0.9901,
+     "broad": 0.7228,
+     "full": 0.9525,
+     "chroma_err": 0.0001,
+     "score": 0.8758
+    },
+    {
+     "param": 64,
+     "fine": 0.9907,
+     "mid": 0.9903,
+     "broad": 0.701,
+     "full": 0.959,
+     "chroma_err": 0.0001,
+     "score": 0.8684
+    },
+    {
+     "param": 32,
+     "fine": 0.9907,
+     "mid": 0.9889,
+     "broad": 0.5657,
+     "full": 0.9455,
+     "chroma_err": 0.0001,
+     "score": 0.8113
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9765,
+     "broad": 0.3545,
+     "full": 0.9296,
+     "chroma_err": 0.0001,
+     "score": 0.7211
+    }
+   ],
+   "best": {
+    "param": 128,
+    "fine": 0.9907,
+    "mid": 0.9901,
+    "broad": 0.7228,
+    "full": 0.9525,
+    "chroma_err": 0.0001,
+    "score": 0.8758
+   },
+   "seconds": 1.5
+  },
+  "M16": {
+   "name": "hybride normales locales + bilatéral",
+   "phases": [
+    {
+     "param": 64,
+     "fine": 0.9229,
+     "mid": 0.8779,
+     "broad": 0.6029,
+     "full": 0.8572,
+     "chroma_err": 0.0001,
+     "score": 0.7728
+    },
+    {
+     "param": 32,
+     "fine": 0.9229,
+     "mid": 0.8891,
+     "broad": 0.5755,
+     "full": 0.8582,
+     "chroma_err": 0.0001,
+     "score": 0.7642
+    },
+    {
+     "param": 16,
+     "fine": 0.9228,
+     "mid": 0.8794,
+     "broad": 0.499,
+     "full": 0.8472,
+     "chroma_err": 0.0001,
+     "score": 0.7295
+    },
+    {
+     "param": 8,
+     "fine": 0.9227,
+     "mid": 0.8465,
+     "broad": 0.429,
+     "full": 0.8296,
+     "chroma_err": 0.0001,
+     "score": 0.6914
+    }
+   ],
+   "best": {
+    "param": 64,
+    "fine": 0.9229,
+    "mid": 0.8779,
+    "broad": 0.6029,
+    "full": 0.8572,
+    "chroma_err": 0.0001,
+    "score": 0.7728
+   },
+   "seconds": 1.3
+  }
+ },
+ "bracket": [
+  {
+   "round": 1,
+   "a": "M01",
+   "b": "M02",
+   "score_a": 0.8781,
+   "score_b": 0.8632,
+   "winner": "M01"
+  },
+  {
+   "round": 1,
+   "a": "M03",
+   "b": "M04",
+   "score_a": 0.8744,
+   "score_b": 0.8078,
+   "winner": "M03"
+  },
+  {
+   "round": 1,
+   "a": "M05",
+   "b": "M06",
+   "score_a": 0.7718,
+   "score_b": 0.8534,
+   "winner": "M06"
+  },
+  {
+   "round": 1,
+   "a": "M07",
+   "b": "M08",
+   "score_a": 0.818,
+   "score_b": 0.7918,
+   "winner": "M07"
+  },
+  {
+   "round": 1,
+   "a": "M09",
+   "b": "M10",
+   "score_a": 0.6554,
+   "score_b": 0.3963,
+   "winner": "M09"
+  },
+  {
+   "round": 1,
+   "a": "M11",
+   "b": "M12",
+   "score_a": 0.8794,
+   "score_b": 0.8477,
+   "winner": "M11"
+  },
+  {
+   "round": 1,
+   "a": "M13",
+   "b": "M14",
+   "score_a": 0.873,
+   "score_b": 0.7333,
+   "winner": "M13"
+  },
+  {
+   "round": 1,
+   "a": "M15",
+   "b": "M16",
+   "score_a": 0.8758,
+   "score_b": 0.7728,
+   "winner": "M15"
+  },
+  {
+   "round": 2,
+   "a": "M01",
+   "b": "M03",
+   "score_a": 0.8781,
+   "score_b": 0.8744,
+   "winner": "M01"
+  },
+  {
+   "round": 2,
+   "a": "M06",
+   "b": "M07",
+   "score_a": 0.8534,
+   "score_b": 0.818,
+   "winner": "M06"
+  },
+  {
+   "round": 2,
+   "a": "M09",
+   "b": "M11",
+   "score_a": 0.6554,
+   "score_b": 0.8794,
+   "winner": "M11"
+  },
+  {
+   "round": 2,
+   "a": "M13",
+   "b": "M15",
+   "score_a": 0.873,
+   "score_b": 0.8758,
+   "winner": "M15"
+  },
+  {
+   "round": 3,
+   "a": "M01",
+   "b": "M06",
+   "score_a": 0.8781,
+   "score_b": 0.8534,
+   "winner": "M01"
+  },
+  {
+   "round": 3,
+   "a": "M11",
+   "b": "M15",
+   "score_a": 0.8794,
+   "score_b": 0.8758,
+   "winner": "M11"
+  },
+  {
+   "round": 4,
+   "a": "M01",
+   "b": "M11",
+   "score_a": 0.8781,
+   "score_b": 0.8794,
+   "winner": "M11"
+  }
+ ],
+ "winner": "M11"
+}

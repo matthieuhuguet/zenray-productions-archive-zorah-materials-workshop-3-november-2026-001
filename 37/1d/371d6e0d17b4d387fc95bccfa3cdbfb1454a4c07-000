@@ -1,0 +1,48 @@
+# Tournoi de délighting de la base color, la 4 de Zorah (4 November 2026, 02:39 +0100)
+
+Demande de Matthieu (4 November 2026, 02:36) : le prompt et le Python actuels ne marchent pas ; e4check garde les bandes de lumière du panneau presque pixel pour pixel. On repart de zéro : corriger la base color depuis l'image de référence, retirer le bug d'ombrage, garder le plus de détails, sans lumière ; faire le test soi-même, puis adapter le prompt. (4 November 2026)
+
+Symptôme mesurable : la lumière du panneau (spot, bandes d'ombre portée en diagonale, relief éclairé) reste dans la base color, ou bien son retrait lisse les détails et change les couleurs. (4 November 2026)
+
+Banc à vérité connue : `Scripts/DelightTournament.py`. Une base color connue (d2 harmonisée V4) est éclairée par la lumière mesurée sur le vrai panneau (lumière large et bandes d'ombre tirées du rapport panneau sur base color, relief tiré des normales de la height finale, direction de lumière régressée sur le panneau). Chaque méthode doit retrouver la base color. Vérificateur dans les deux sens : vérité contre elle-même 1,0, entrée éclairée 0,67, vérité inversée moins 1,39. (4 November 2026)
+
+Score : corrélations avec la vérité en log luminance (détail fin, détail moyen, niveau large compté double, image entière), moins l'erreur de chromaticité. Quatre phases par méthode : son réglage principal, du plus large au plus fin. Tableau 16, 8, 4, 2, 1 sur la meilleure phase ; verdict final à l'œil sur le vrai panneau. (4 November 2026)
+
+| Code | Principe | Phases (réglage) |
+|---|---|---|
+| M01 | champ plat : luminance divisée par son flou | flou 128, 64, 32, 16 px |
+| M02 | surface polynomiale ajustée puis divisée | degré 2, 3, 4, 6 |
+| M03 | Retinex multi échelle (trois flous moyennés) | échelle 128, 64, 32, 16 |
+| M04 | bilatéral : lumière estimée en gardant ses bords | espace 64, 32, 16, 8 |
+| M05 | filtre guidé (modèle linéaire local) | rayon 64, 32, 16, 8 |
+| M06 | fermeture morphologique, rolling ball par le haut | taille 128, 64, 32, 16 |
+| M07 | harmoniques sur les normales de la height, puis polynôme | 64, 32, 16, 8 |
+| M08 | normales locales : régression par tuiles (ambiant, direction) | tuiles 4, 8, 16, 32 |
+| M09 | blocs segmentés par la height : pente par bloc, surface lisse entre blocs | degré 1, 2, 3, 4 |
+| M10 | Retinex de Horn : petits gradients retirés, reconstruction de Poisson | percentile 50, 70, 85, 95 |
+| M11 | normalisation locale du contraste | 128, 64, 32, 16 |
+| M12 | pyramide de bandes à gain local | 4, 5, 6, 7 bandes |
+| M13 | régions d'ombre détectées puis rééclairées | 48, 32, 24, 16 |
+| M14 | gradients de lumière gardés seulement où la chromaticité change | 16, 8, 4, 2 |
+| M15 | filtre de rang (70e percentile) | 128, 64, 32, 16 |
+| M16 | hybride : normales locales puis bilatéral | 64, 32, 16, 8 |
+
+Toutes les méthodes travaillent sur la luminance en lumière linéaire et gardent la chromaticité de l'entrée ; l'exposition finale suit la lumière principale de la référence (Retinex), jamais une valeur fixe. (4 November 2026)
+
+## Tour 1, banc à lumière douce (4 November 2026, 02:40 +0100)
+
+- Scores du banc (meilleure phase) : M11 0,879 (64), M01 0,878 (64), M15 0,876 (128), M03 0,874 (16), M13 0,873 (48), M02 0,863, M06 0,853, M12 0,848, M07 0,818, M04 0,808, M08 0,792, M16 0,773, M05 0,772, M14 0,733, M09 0,655, M10 0,396 ; entrée éclairée 0,669. Vainqueur du tableau : M11 contre M01 en finale (0,8794 contre 0,8781). (4 November 2026)
+- Verdict à l'œil sur le vrai panneau (`sheet_real_panel.png`) : la bande d'ombre en diagonale reste dans toutes les méthodes qui gardent les teintes des blocs (M01, M02, M06, M07, M11 à M15) ; celles qui l'effacent (M03 à petite échelle, M04, M05, M16) délavent les teintes. M09 (blocs segmentés naïfs) et M10 (Horn) cassent l'image : écartées, elles ne se rejouent pas. Cause du décalage entre banc et vrai panneau : la lumière du banc, floutée à 24 px, avait des bandes trop douces. (4 November 2026)
+- Tour 2 : banc à lumière analytique (bandes d'ombre nettes, pénombre de 2 % de la largeur, spot, vignettage), et deux méthodes nouvelles fondées sur la height : M17, lumière reconstruite par Poisson depuis les seuls gradients internes aux blocs (les gradients qui traversent un joint sont ignorés, la lumière étant continue d'un bloc à l'autre alors que la couleur saute) ; M18, M17 plus le relief éclairé retiré par la direction de lumière régressée sur les normales. (4 November 2026)
+
+## Tour 2, banc à bandes d'ombre nettes (4 November 2026, 02:44 +0100)
+
+- Scores du banc (meilleure phase) : M04 0,848 (64), M13 0,840 (16), M02 0,825, M06 0,824, M15 0,823, M03 0,820, M11 0,814, M17 0,814 (8), M01 0,803, M16 0,796, M12 0,792, M05 0,786, M18 0,777, M07 0,773, M14 0,756, M08 0,735 ; entrée éclairée 0,692. Tableau : M04 bat M02, M06 puis M13 en finale (0,848 contre 0,840). (4 November 2026)
+- Défaites consignées : M01, M03, M05, M07, M08, M11, M12, M14, M16, M18 sortent au premier ou au deuxième tour ; les méthodes fondées sur les normales (M07, M08, M16, M18) perdent du détail fin (corrélation 0,92 contre 0,99), car la régression du relief absorbe aussi la couleur des joints et des pores. (4 November 2026)
+- À l'œil, sur le vrai panneau (`finalists.png`) : M04 efface presque toute la bande et garde le détail, mais aplatit un peu les teintes ; M13 et M15 gardent une trace de la bande ; M17 est la seule à l'effacer en gardant les teintes des blocs, mais elle force des marches de clarté d'un bloc à l'autre dans les coins sombres. Verdict à Matthieu, puis réglage du seul vainqueur. (4 November 2026)
+- Conséquence pour le prompt : la génération d'image change la composition et les couleurs (e4check garde la bande presque pixel pour pixel) ; la base color doit se faire en Python seulement, par la méthode gagnante, puis le prompt décrira cette méthode. (4 November 2026)
+
+## Tour 3, M02 et M13 retenues par Matthieu (4 November 2026, 02:53 +0100)
+
+- Matthieu (02:49) : « M02 et M13 sont excellents, adapte-les via un nouveau round ». Huit variantes sur le banc à bandes nettes : R01 M02 0,825, R02 M02 sur la pierre 0,825, R03 M13 0,833, R04 M13 bilatéral 0,839, R05 M13 trois niveaux 0,839, R06 M02 puis M13 0,815, R07 M13 puis M02 sur la pierre 0,852, R08 masque plus net 0,832. Vainqueur R07 (bat R08, R05 puis R04). (4 November 2026)
+- Réglage du seul vainqueur (`tuning_R07.json`, 36 essais) : trois niveaux, flou d'un soixante-quatrième de la largeur, masque 0,35, degré 3 : 0,857, lumière restante sur le vrai panneau 0,403. Quatre niveaux retirent davantage de lumière (0,39) mais baissent le banc (0,851). Devenu `scripts/height/DelightBaseColor.py` du skill zenray-houdini et le prompt V5. (4 November 2026)

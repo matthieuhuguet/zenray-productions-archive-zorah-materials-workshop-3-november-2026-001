@@ -1,0 +1,966 @@
+{
+ "methods": {
+  "M01": {
+   "name": "champ plat (flou)",
+   "phases": [
+    {
+     "param": 128,
+     "fine": 0.9907,
+     "mid": 0.9848,
+     "broad": 0.5595,
+     "full": 0.907,
+     "chroma_err": 0.0001,
+     "score": 0.8003
+    },
+    {
+     "param": 64,
+     "fine": 0.9907,
+     "mid": 0.985,
+     "broad": 0.552,
+     "full": 0.9365,
+     "chroma_err": 0.0001,
+     "score": 0.8033
+    },
+    {
+     "param": 32,
+     "fine": 0.9907,
+     "mid": 0.9856,
+     "broad": 0.5431,
+     "full": 0.946,
+     "chroma_err": 0.0001,
+     "score": 0.8017
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9846,
+     "broad": 0.4898,
+     "full": 0.9388,
+     "chroma_err": 0.0001,
+     "score": 0.7788
+    }
+   ],
+   "best": {
+    "param": 64,
+    "fine": 0.9907,
+    "mid": 0.985,
+    "broad": 0.552,
+    "full": 0.9365,
+    "chroma_err": 0.0001,
+    "score": 0.8033
+   },
+   "seconds": 1.8
+  },
+  "M02": {
+   "name": "surface polynomiale",
+   "phases": [
+    {
+     "param": 2,
+     "fine": 0.9907,
+     "mid": 0.9848,
+     "broad": 0.6088,
+     "full": 0.8884,
+     "chroma_err": 0.0001,
+     "score": 0.8163
+    },
+    {
+     "param": 3,
+     "fine": 0.9907,
+     "mid": 0.9848,
+     "broad": 0.6272,
+     "full": 0.8962,
+     "chroma_err": 0.0001,
+     "score": 0.8252
+    },
+    {
+     "param": 4,
+     "fine": 0.9907,
+     "mid": 0.9846,
+     "broad": 0.4396,
+     "full": 0.883,
+     "chroma_err": 0.0001,
+     "score": 0.7475
+    },
+    {
+     "param": 6,
+     "fine": 0.9907,
+     "mid": 0.9847,
+     "broad": 0.4331,
+     "full": 0.8986,
+     "chroma_err": 0.0001,
+     "score": 0.748
+    }
+   ],
+   "best": {
+    "param": 3,
+    "fine": 0.9907,
+    "mid": 0.9848,
+    "broad": 0.6272,
+    "full": 0.8962,
+    "chroma_err": 0.0001,
+    "score": 0.8252
+   },
+   "seconds": 1.4
+  },
+  "M03": {
+   "name": "Retinex multi échelle",
+   "phases": [
+    {
+     "param": 128,
+     "fine": 0.9907,
+     "mid": 0.9852,
+     "broad": 0.528,
+     "full": 0.9095,
+     "chroma_err": 0.0001,
+     "score": 0.7883
+    },
+    {
+     "param": 64,
+     "fine": 0.9907,
+     "mid": 0.9858,
+     "broad": 0.5776,
+     "full": 0.9392,
+     "chroma_err": 0.0001,
+     "score": 0.8142
+    },
+    {
+     "param": 32,
+     "fine": 0.9907,
+     "mid": 0.9836,
+     "broad": 0.5881,
+     "full": 0.9479,
+     "chroma_err": 0.0001,
+     "score": 0.8197
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9759,
+     "broad": 0.5631,
+     "full": 0.9417,
+     "chroma_err": 0.0001,
+     "score": 0.8069
+    }
+   ],
+   "best": {
+    "param": 32,
+    "fine": 0.9907,
+    "mid": 0.9836,
+    "broad": 0.5881,
+    "full": 0.9479,
+    "chroma_err": 0.0001,
+    "score": 0.8197
+   },
+   "seconds": 5.9
+  },
+  "M04": {
+   "name": "bilatéral (bords de lumière gardés)",
+   "phases": [
+    {
+     "param": 64,
+     "fine": 0.9894,
+     "mid": 0.9466,
+     "broad": 0.6855,
+     "full": 0.9337,
+     "chroma_err": 0.0001,
+     "score": 0.8482
+    },
+    {
+     "param": 32,
+     "fine": 0.9895,
+     "mid": 0.9479,
+     "broad": 0.6041,
+     "full": 0.9276,
+     "chroma_err": 0.0001,
+     "score": 0.8146
+    },
+    {
+     "param": 16,
+     "fine": 0.9894,
+     "mid": 0.9367,
+     "broad": 0.4937,
+     "full": 0.9148,
+     "chroma_err": 0.0001,
+     "score": 0.7656
+    },
+    {
+     "param": 8,
+     "fine": 0.9892,
+     "mid": 0.9039,
+     "broad": 0.3907,
+     "full": 0.898,
+     "chroma_err": 0.0001,
+     "score": 0.7145
+    }
+   ],
+   "best": {
+    "param": 64,
+    "fine": 0.9894,
+    "mid": 0.9466,
+    "broad": 0.6855,
+    "full": 0.9337,
+    "chroma_err": 0.0001,
+    "score": 0.8482
+   },
+   "seconds": 1.0
+  },
+  "M05": {
+   "name": "filtre guidé",
+   "phases": [
+    {
+     "param": 64,
+     "fine": 0.9883,
+     "mid": 0.8438,
+     "broad": 0.6081,
+     "full": 0.8791,
+     "chroma_err": 0.0001,
+     "score": 0.7855
+    },
+    {
+     "param": 32,
+     "fine": 0.9881,
+     "mid": 0.8187,
+     "broad": 0.4753,
+     "full": 0.872,
+     "chroma_err": 0.0001,
+     "score": 0.7259
+    },
+    {
+     "param": 16,
+     "fine": 0.9874,
+     "mid": 0.7632,
+     "broad": 0.325,
+     "full": 0.8582,
+     "chroma_err": 0.0001,
+     "score": 0.6518
+    },
+    {
+     "param": 8,
+     "fine": 0.986,
+     "mid": 0.6788,
+     "broad": 0.2203,
+     "full": 0.8398,
+     "chroma_err": 0.0001,
+     "score": 0.589
+    }
+   ],
+   "best": {
+    "param": 64,
+    "fine": 0.9883,
+    "mid": 0.8438,
+    "broad": 0.6081,
+    "full": 0.8791,
+    "chroma_err": 0.0001,
+    "score": 0.7855
+   },
+   "seconds": 1.1
+  },
+  "M06": {
+   "name": "fermeture (rolling ball haut)",
+   "phases": [
+    {
+     "param": 128,
+     "fine": 0.9907,
+     "mid": 0.9849,
+     "broad": 0.4949,
+     "full": 0.9065,
+     "chroma_err": 0.0001,
+     "score": 0.7744
+    },
+    {
+     "param": 64,
+     "fine": 0.9907,
+     "mid": 0.9855,
+     "broad": 0.5964,
+     "full": 0.9487,
+     "chroma_err": 0.0001,
+     "score": 0.8235
+    },
+    {
+     "param": 32,
+     "fine": 0.9907,
+     "mid": 0.9863,
+     "broad": 0.5426,
+     "full": 0.9459,
+     "chroma_err": 0.0001,
+     "score": 0.8016
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9773,
+     "broad": 0.3876,
+     "full": 0.932,
+     "chroma_err": 0.0001,
+     "score": 0.735
+    }
+   ],
+   "best": {
+    "param": 64,
+    "fine": 0.9907,
+    "mid": 0.9855,
+    "broad": 0.5964,
+    "full": 0.9487,
+    "chroma_err": 0.0001,
+    "score": 0.8235
+   },
+   "seconds": 0.9
+  },
+  "M07": {
+   "name": "harmoniques sur normales + polynôme",
+   "phases": [
+    {
+     "param": 64,
+     "fine": 0.9181,
+     "mid": 0.9196,
+     "broad": 0.6065,
+     "full": 0.8029,
+     "chroma_err": 0.0001,
+     "score": 0.7707
+    },
+    {
+     "param": 32,
+     "fine": 0.9185,
+     "mid": 0.92,
+     "broad": 0.6065,
+     "full": 0.8032,
+     "chroma_err": 0.0001,
+     "score": 0.771
+    },
+    {
+     "param": 16,
+     "fine": 0.9194,
+     "mid": 0.921,
+     "broad": 0.6066,
+     "full": 0.804,
+     "chroma_err": 0.0001,
+     "score": 0.7715
+    },
+    {
+     "param": 8,
+     "fine": 0.9218,
+     "mid": 0.9236,
+     "broad": 0.6068,
+     "full": 0.806,
+     "chroma_err": 0.0001,
+     "score": 0.773
+    }
+   ],
+   "best": {
+    "param": 8,
+    "fine": 0.9218,
+    "mid": 0.9236,
+    "broad": 0.6068,
+    "full": 0.806,
+    "chroma_err": 0.0001,
+    "score": 0.773
+   },
+   "seconds": 1.4
+  },
+  "M08": {
+   "name": "normales locales par tuiles",
+   "phases": [
+    {
+     "param": 4,
+     "fine": 0.9254,
+     "mid": 0.9282,
+     "broad": 0.4872,
+     "full": 0.8213,
+     "chroma_err": 0.0001,
+     "score": 0.7298
+    },
+    {
+     "param": 8,
+     "fine": 0.9246,
+     "mid": 0.9254,
+     "broad": 0.4833,
+     "full": 0.8591,
+     "chroma_err": 0.0001,
+     "score": 0.7351
+    },
+    {
+     "param": 16,
+     "fine": 0.924,
+     "mid": 0.9196,
+     "broad": 0.468,
+     "full": 0.87,
+     "chroma_err": 0.0001,
+     "score": 0.7299
+    },
+    {
+     "param": 32,
+     "fine": 0.9239,
+     "mid": 0.9117,
+     "broad": 0.3482,
+     "full": 0.8593,
+     "chroma_err": 0.0001,
+     "score": 0.6783
+    }
+   ],
+   "best": {
+    "param": 8,
+    "fine": 0.9246,
+    "mid": 0.9254,
+    "broad": 0.4833,
+    "full": 0.8591,
+    "chroma_err": 0.0001,
+    "score": 0.7351
+   },
+   "seconds": 1.0
+  },
+  "M11": {
+   "name": "normalisation locale du contraste",
+   "phases": [
+    {
+     "param": 128,
+     "fine": 0.9847,
+     "mid": 0.9808,
+     "broad": 0.5932,
+     "full": 0.9152,
+     "chroma_err": 0.0001,
+     "score": 0.8134
+    },
+    {
+     "param": 64,
+     "fine": 0.9819,
+     "mid": 0.9774,
+     "broad": 0.5879,
+     "full": 0.9348,
+     "chroma_err": 0.0001,
+     "score": 0.814
+    },
+    {
+     "param": 32,
+     "fine": 0.9717,
+     "mid": 0.9645,
+     "broad": 0.5542,
+     "full": 0.9287,
+     "chroma_err": 0.0001,
+     "score": 0.7947
+    },
+    {
+     "param": 16,
+     "fine": 0.9515,
+     "mid": 0.9381,
+     "broad": 0.4736,
+     "full": 0.8991,
+     "chroma_err": 0.0001,
+     "score": 0.7472
+    }
+   ],
+   "best": {
+    "param": 64,
+    "fine": 0.9819,
+    "mid": 0.9774,
+    "broad": 0.5879,
+    "full": 0.9348,
+    "chroma_err": 0.0001,
+    "score": 0.814
+   },
+   "seconds": 2.5
+  },
+  "M12": {
+   "name": "pyramide à gain local",
+   "phases": [
+    {
+     "param": 4,
+     "fine": 0.9279,
+     "mid": 0.9318,
+     "broad": 0.4918,
+     "full": 0.8823,
+     "chroma_err": 0.0001,
+     "score": 0.7451
+    },
+    {
+     "param": 5,
+     "fine": 0.9279,
+     "mid": 0.9332,
+     "broad": 0.5747,
+     "full": 0.8932,
+     "chroma_err": 0.0001,
+     "score": 0.7808
+    },
+    {
+     "param": 6,
+     "fine": 0.9279,
+     "mid": 0.9327,
+     "broad": 0.605,
+     "full": 0.8901,
+     "chroma_err": 0.0001,
+     "score": 0.7921
+    },
+    {
+     "param": 7,
+     "fine": 0.9279,
+     "mid": 0.9325,
+     "broad": 0.5967,
+     "full": 0.8639,
+     "chroma_err": 0.0001,
+     "score": 0.7836
+    }
+   ],
+   "best": {
+    "param": 6,
+    "fine": 0.9279,
+    "mid": 0.9327,
+    "broad": 0.605,
+    "full": 0.8901,
+    "chroma_err": 0.0001,
+    "score": 0.7921
+   },
+   "seconds": 9.6
+  },
+  "M13": {
+   "name": "régions d'ombre rééclairées",
+   "phases": [
+    {
+     "param": 48,
+     "fine": 0.9907,
+     "mid": 0.9853,
+     "broad": 0.609,
+     "full": 0.9322,
+     "chroma_err": 0.0001,
+     "score": 0.8252
+    },
+    {
+     "param": 32,
+     "fine": 0.9907,
+     "mid": 0.9857,
+     "broad": 0.6281,
+     "full": 0.941,
+     "chroma_err": 0.0001,
+     "score": 0.8347
+    },
+    {
+     "param": 24,
+     "fine": 0.9907,
+     "mid": 0.9861,
+     "broad": 0.6348,
+     "full": 0.9445,
+     "chroma_err": 0.0001,
+     "score": 0.8382
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9861,
+     "broad": 0.6371,
+     "full": 0.9468,
+     "chroma_err": 0.0001,
+     "score": 0.8396
+    }
+   ],
+   "best": {
+    "param": 16,
+    "fine": 0.9907,
+    "mid": 0.9861,
+    "broad": 0.6371,
+    "full": 0.9468,
+    "chroma_err": 0.0001,
+    "score": 0.8396
+   },
+   "seconds": 1.3
+  },
+  "M14": {
+   "name": "gradients guidés par la chromaticité",
+   "phases": [
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9859,
+     "broad": 0.4507,
+     "full": 0.904,
+     "chroma_err": 0.0001,
+     "score": 0.7564
+    },
+    {
+     "param": 8,
+     "fine": 0.9907,
+     "mid": 0.9809,
+     "broad": 0.4207,
+     "full": 0.8991,
+     "chroma_err": 0.0001,
+     "score": 0.7424
+    },
+    {
+     "param": 4,
+     "fine": 0.9906,
+     "mid": 0.9675,
+     "broad": 0.3779,
+     "full": 0.8769,
+     "chroma_err": 0.0001,
+     "score": 0.7182
+    },
+    {
+     "param": 2,
+     "fine": 0.9905,
+     "mid": 0.9621,
+     "broad": 0.2197,
+     "full": 0.6452,
+     "chroma_err": 0.0002,
+     "score": 0.6074
+    }
+   ],
+   "best": {
+    "param": 16,
+    "fine": 0.9907,
+    "mid": 0.9859,
+    "broad": 0.4507,
+    "full": 0.904,
+    "chroma_err": 0.0001,
+    "score": 0.7564
+   },
+   "seconds": 1.6
+  },
+  "M15": {
+   "name": "filtre de rang (70e percentile)",
+   "phases": [
+    {
+     "param": 128,
+     "fine": 0.9907,
+     "mid": 0.985,
+     "broad": 0.5725,
+     "full": 0.9325,
+     "chroma_err": 0.0001,
+     "score": 0.8106
+    },
+    {
+     "param": 64,
+     "fine": 0.9907,
+     "mid": 0.9855,
+     "broad": 0.5944,
+     "full": 0.9493,
+     "chroma_err": 0.0001,
+     "score": 0.8229
+    },
+    {
+     "param": 32,
+     "fine": 0.9907,
+     "mid": 0.9861,
+     "broad": 0.53,
+     "full": 0.9442,
+     "chroma_err": 0.0001,
+     "score": 0.7962
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9758,
+     "broad": 0.3948,
+     "full": 0.9312,
+     "chroma_err": 0.0001,
+     "score": 0.7375
+    }
+   ],
+   "best": {
+    "param": 64,
+    "fine": 0.9907,
+    "mid": 0.9855,
+    "broad": 0.5944,
+    "full": 0.9493,
+    "chroma_err": 0.0001,
+    "score": 0.8229
+   },
+   "seconds": 1.4
+  },
+  "M16": {
+   "name": "hybride normales locales + bilatéral",
+   "phases": [
+    {
+     "param": 64,
+     "fine": 0.9238,
+     "mid": 0.9008,
+     "broad": 0.6426,
+     "full": 0.8722,
+     "chroma_err": 0.0001,
+     "score": 0.7964
+    },
+    {
+     "param": 32,
+     "fine": 0.9237,
+     "mid": 0.8993,
+     "broad": 0.5737,
+     "full": 0.8658,
+     "chroma_err": 0.0001,
+     "score": 0.7672
+    },
+    {
+     "param": 16,
+     "fine": 0.9236,
+     "mid": 0.8878,
+     "broad": 0.4813,
+     "full": 0.8524,
+     "chroma_err": 0.0001,
+     "score": 0.7253
+    },
+    {
+     "param": 8,
+     "fine": 0.9234,
+     "mid": 0.8561,
+     "broad": 0.396,
+     "full": 0.8342,
+     "chroma_err": 0.0001,
+     "score": 0.6811
+    }
+   ],
+   "best": {
+    "param": 64,
+    "fine": 0.9238,
+    "mid": 0.9008,
+    "broad": 0.6426,
+    "full": 0.8722,
+    "chroma_err": 0.0001,
+    "score": 0.7964
+   },
+   "seconds": 1.2
+  },
+  "M17": {
+   "name": "Poisson des joints (lumière continue entre blocs)",
+   "phases": [
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9802,
+     "broad": 0.4717,
+     "full": 0.8999,
+     "chroma_err": 0.0001,
+     "score": 0.7628
+    },
+    {
+     "param": 12,
+     "fine": 0.9907,
+     "mid": 0.9775,
+     "broad": 0.5314,
+     "full": 0.9156,
+     "chroma_err": 0.0001,
+     "score": 0.7893
+    },
+    {
+     "param": 8,
+     "fine": 0.9907,
+     "mid": 0.9681,
+     "broad": 0.5919,
+     "full": 0.9264,
+     "chroma_err": 0.0001,
+     "score": 0.8138
+    },
+    {
+     "param": 4,
+     "fine": 0.9906,
+     "mid": 0.9366,
+     "broad": 0.6017,
+     "full": 0.9202,
+     "chroma_err": 0.0001,
+     "score": 0.8102
+    }
+   ],
+   "best": {
+    "param": 8,
+    "fine": 0.9907,
+    "mid": 0.9681,
+    "broad": 0.5919,
+    "full": 0.9264,
+    "chroma_err": 0.0001,
+    "score": 0.8138
+   },
+   "seconds": 1.7
+  },
+  "M18": {
+   "name": "Poisson des joints + relief retiré",
+   "phases": [
+    {
+     "param": 16,
+     "fine": 0.9306,
+     "mid": 0.9275,
+     "broad": 0.4691,
+     "full": 0.8291,
+     "chroma_err": 0.0001,
+     "score": 0.7251
+    },
+    {
+     "param": 12,
+     "fine": 0.9306,
+     "mid": 0.9258,
+     "broad": 0.5262,
+     "full": 0.8468,
+     "chroma_err": 0.0001,
+     "score": 0.7511
+    },
+    {
+     "param": 8,
+     "fine": 0.9305,
+     "mid": 0.9171,
+     "broad": 0.5817,
+     "full": 0.8589,
+     "chroma_err": 0.0001,
+     "score": 0.774
+    },
+    {
+     "param": 4,
+     "fine": 0.9305,
+     "mid": 0.8852,
+     "broad": 0.6071,
+     "full": 0.8552,
+     "chroma_err": 0.0001,
+     "score": 0.777
+    }
+   ],
+   "best": {
+    "param": 4,
+    "fine": 0.9305,
+    "mid": 0.8852,
+    "broad": 0.6071,
+    "full": 0.8552,
+    "chroma_err": 0.0001,
+    "score": 0.777
+   },
+   "seconds": 4.6
+  }
+ },
+ "bracket": [
+  {
+   "round": 1,
+   "a": "M01",
+   "b": "M02",
+   "score_a": 0.8033,
+   "score_b": 0.8252,
+   "winner": "M02"
+  },
+  {
+   "round": 1,
+   "a": "M03",
+   "b": "M04",
+   "score_a": 0.8197,
+   "score_b": 0.8482,
+   "winner": "M04"
+  },
+  {
+   "round": 1,
+   "a": "M05",
+   "b": "M06",
+   "score_a": 0.7855,
+   "score_b": 0.8235,
+   "winner": "M06"
+  },
+  {
+   "round": 1,
+   "a": "M07",
+   "b": "M08",
+   "score_a": 0.773,
+   "score_b": 0.7351,
+   "winner": "M07"
+  },
+  {
+   "round": 1,
+   "a": "M11",
+   "b": "M12",
+   "score_a": 0.814,
+   "score_b": 0.7921,
+   "winner": "M11"
+  },
+  {
+   "round": 1,
+   "a": "M13",
+   "b": "M14",
+   "score_a": 0.8396,
+   "score_b": 0.7564,
+   "winner": "M13"
+  },
+  {
+   "round": 1,
+   "a": "M15",
+   "b": "M16",
+   "score_a": 0.8229,
+   "score_b": 0.7964,
+   "winner": "M15"
+  },
+  {
+   "round": 1,
+   "a": "M17",
+   "b": "M18",
+   "score_a": 0.8138,
+   "score_b": 0.777,
+   "winner": "M17"
+  },
+  {
+   "round": 2,
+   "a": "M02",
+   "b": "M04",
+   "score_a": 0.8252,
+   "score_b": 0.8482,
+   "winner": "M04"
+  },
+  {
+   "round": 2,
+   "a": "M06",
+   "b": "M07",
+   "score_a": 0.8235,
+   "score_b": 0.773,
+   "winner": "M06"
+  },
+  {
+   "round": 2,
+   "a": "M11",
+   "b": "M13",
+   "score_a": 0.814,
+   "score_b": 0.8396,
+   "winner": "M13"
+  },
+  {
+   "round": 2,
+   "a": "M15",
+   "b": "M17",
+   "score_a": 0.8229,
+   "score_b": 0.8138,
+   "winner": "M15"
+  },
+  {
+   "round": 3,
+   "a": "M04",
+   "b": "M06",
+   "score_a": 0.8482,
+   "score_b": 0.8235,
+   "winner": "M04"
+  },
+  {
+   "round": 3,
+   "a": "M13",
+   "b": "M15",
+   "score_a": 0.8396,
+   "score_b": 0.8229,
+   "winner": "M13"
+  },
+  {
+   "round": 4,
+   "a": "M04",
+   "b": "M13",
+   "score_a": 0.8482,
+   "score_b": 0.8396,
+   "winner": "M04"
+  }
+ ],
+ "winner": "M04",
+ "verifier": [
+  1.0,
+  0.6924
+ ],
+ "params": {
+  "solve_size": 256,
+  "joint_k": 2.0,
+  "lambda": 0.001,
+  "spot": [
+   0.62,
+   -0.05,
+   0.55
+  ],
+  "band": [
+   0.3,
+   0.0,
+   122.0,
+   0.13,
+   0.35
+  ],
+  "penumbra": 0.02,
+  "ambient": 0.18
+ }
+}

@@ -1,0 +1,511 @@
+{
+ "variants": {
+  "R01": {
+   "name": "M02 surface polynomiale (référence)",
+   "phases": [
+    {
+     "param": 2,
+     "fine": 0.9907,
+     "mid": 0.9848,
+     "broad": 0.6088,
+     "full": 0.8884,
+     "chroma_err": 0.0001,
+     "score": 0.8163,
+     "light_left_real": 0.5654
+    },
+    {
+     "param": 3,
+     "fine": 0.9907,
+     "mid": 0.9848,
+     "broad": 0.6272,
+     "full": 0.8962,
+     "chroma_err": 0.0001,
+     "score": 0.8252,
+     "light_left_real": 0.5068
+    },
+    {
+     "param": 4,
+     "fine": 0.9907,
+     "mid": 0.9846,
+     "broad": 0.4396,
+     "full": 0.883,
+     "chroma_err": 0.0001,
+     "score": 0.7475,
+     "light_left_real": 0.3116
+    },
+    {
+     "param": 6,
+     "fine": 0.9907,
+     "mid": 0.9847,
+     "broad": 0.4331,
+     "full": 0.8986,
+     "chroma_err": 0.0001,
+     "score": 0.748,
+     "light_left_real": 0.2255
+    }
+   ],
+   "best": {
+    "param": 3,
+    "fine": 0.9907,
+    "mid": 0.9848,
+    "broad": 0.6272,
+    "full": 0.8962,
+    "chroma_err": 0.0001,
+    "score": 0.8252,
+    "light_left_real": 0.5068
+   },
+   "seconds": 2.0
+  },
+  "R02": {
+   "name": "M02 surface ajustée sur la pierre seule",
+   "phases": [
+    {
+     "param": 2,
+     "fine": 0.9907,
+     "mid": 0.9848,
+     "broad": 0.6089,
+     "full": 0.8884,
+     "chroma_err": 0.0001,
+     "score": 0.8163,
+     "light_left_real": 0.564
+    },
+    {
+     "param": 3,
+     "fine": 0.9907,
+     "mid": 0.9848,
+     "broad": 0.6277,
+     "full": 0.8963,
+     "chroma_err": 0.0001,
+     "score": 0.8254,
+     "light_left_real": 0.5051
+    },
+    {
+     "param": 4,
+     "fine": 0.9907,
+     "mid": 0.9846,
+     "broad": 0.4386,
+     "full": 0.8828,
+     "chroma_err": 0.0001,
+     "score": 0.7471,
+     "light_left_real": 0.3079
+    },
+    {
+     "param": 6,
+     "fine": 0.9907,
+     "mid": 0.9847,
+     "broad": 0.4304,
+     "full": 0.8981,
+     "chroma_err": 0.0001,
+     "score": 0.7469,
+     "light_left_real": 0.2206
+    }
+   ],
+   "best": {
+    "param": 3,
+    "fine": 0.9907,
+    "mid": 0.9848,
+    "broad": 0.6277,
+    "full": 0.8963,
+    "chroma_err": 0.0001,
+    "score": 0.8254,
+    "light_left_real": 0.5051
+   },
+   "seconds": 1.9
+  },
+  "R03": {
+   "name": "M13 régions d'ombre (référence)",
+   "phases": [
+    {
+     "param": 24,
+     "fine": 0.9907,
+     "mid": 0.9862,
+     "broad": 0.6203,
+     "full": 0.9461,
+     "chroma_err": 0.0001,
+     "score": 0.8327,
+     "light_left_real": 0.4848
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9859,
+     "broad": 0.6213,
+     "full": 0.9479,
+     "chroma_err": 0.0001,
+     "score": 0.8334,
+     "light_left_real": 0.4808
+    },
+    {
+     "param": 12,
+     "fine": 0.9907,
+     "mid": 0.9839,
+     "broad": 0.6196,
+     "full": 0.9475,
+     "chroma_err": 0.0001,
+     "score": 0.8322,
+     "light_left_real": 0.4792
+    },
+    {
+     "param": 8,
+     "fine": 0.9907,
+     "mid": 0.9761,
+     "broad": 0.6169,
+     "full": 0.9449,
+     "chroma_err": 0.0001,
+     "score": 0.8291,
+     "light_left_real": 0.4783
+    }
+   ],
+   "best": {
+    "param": 16,
+    "fine": 0.9907,
+    "mid": 0.9859,
+    "broad": 0.6213,
+    "full": 0.9479,
+    "chroma_err": 0.0001,
+    "score": 0.8334,
+    "light_left_real": 0.4808
+   },
+   "seconds": 1.7
+  },
+  "R04": {
+   "name": "M13, ombre trouvée par un bilatéral",
+   "phases": [
+    {
+     "param": 24,
+     "fine": 0.99,
+     "mid": 0.9606,
+     "broad": 0.6396,
+     "full": 0.9364,
+     "chroma_err": 0.0001,
+     "score": 0.8332,
+     "light_left_real": 0.4886
+    },
+    {
+     "param": 16,
+     "fine": 0.99,
+     "mid": 0.9652,
+     "broad": 0.6476,
+     "full": 0.9406,
+     "chroma_err": 0.0001,
+     "score": 0.8382,
+     "light_left_real": 0.4866
+    },
+    {
+     "param": 12,
+     "fine": 0.9901,
+     "mid": 0.9671,
+     "broad": 0.6471,
+     "full": 0.9421,
+     "chroma_err": 0.0001,
+     "score": 0.8387,
+     "light_left_real": 0.485
+    },
+    {
+     "param": 8,
+     "fine": 0.9901,
+     "mid": 0.968,
+     "broad": 0.6393,
+     "full": 0.9425,
+     "chroma_err": 0.0001,
+     "score": 0.8358,
+     "light_left_real": 0.4828
+    }
+   ],
+   "best": {
+    "param": 12,
+    "fine": 0.9901,
+    "mid": 0.9671,
+    "broad": 0.6471,
+    "full": 0.9421,
+    "chroma_err": 0.0001,
+    "score": 0.8387,
+    "light_left_real": 0.485
+   },
+   "seconds": 1.9
+  },
+  "R05": {
+   "name": "M13 à trois niveaux de lumière",
+   "phases": [
+    {
+     "param": 24,
+     "fine": 0.9907,
+     "mid": 0.9864,
+     "broad": 0.6299,
+     "full": 0.952,
+     "chroma_err": 0.0001,
+     "score": 0.8378,
+     "light_left_real": 0.4628
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9861,
+     "broad": 0.6331,
+     "full": 0.9525,
+     "chroma_err": 0.0001,
+     "score": 0.8391,
+     "light_left_real": 0.461
+    },
+    {
+     "param": 12,
+     "fine": 0.9907,
+     "mid": 0.9837,
+     "broad": 0.6269,
+     "full": 0.9507,
+     "chroma_err": 0.0001,
+     "score": 0.8358,
+     "light_left_real": 0.4607
+    },
+    {
+     "param": 8,
+     "fine": 0.9907,
+     "mid": 0.9737,
+     "broad": 0.6155,
+     "full": 0.9458,
+     "chroma_err": 0.0001,
+     "score": 0.8282,
+     "light_left_real": 0.4593
+    }
+   ],
+   "best": {
+    "param": 16,
+    "fine": 0.9907,
+    "mid": 0.9861,
+    "broad": 0.6331,
+    "full": 0.9525,
+    "chroma_err": 0.0001,
+    "score": 0.8391,
+    "light_left_real": 0.461
+   },
+   "seconds": 1.7
+  },
+  "R06": {
+   "name": "M02 sur la pierre puis M13",
+   "phases": [
+    {
+     "param": 24,
+     "fine": 0.9907,
+     "mid": 0.9849,
+     "broad": 0.5833,
+     "full": 0.9349,
+     "chroma_err": 0.0001,
+     "score": 0.8154,
+     "light_left_real": 0.4797
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9843,
+     "broad": 0.5681,
+     "full": 0.9351,
+     "chroma_err": 0.0001,
+     "score": 0.8093,
+     "light_left_real": 0.4804
+    },
+    {
+     "param": 12,
+     "fine": 0.9907,
+     "mid": 0.982,
+     "broad": 0.558,
+     "full": 0.9339,
+     "chroma_err": 0.0001,
+     "score": 0.8045,
+     "light_left_real": 0.4805
+    },
+    {
+     "param": 8,
+     "fine": 0.9907,
+     "mid": 0.9738,
+     "broad": 0.5498,
+     "full": 0.9309,
+     "chroma_err": 0.0001,
+     "score": 0.799,
+     "light_left_real": 0.4806
+    }
+   ],
+   "best": {
+    "param": 24,
+    "fine": 0.9907,
+    "mid": 0.9849,
+    "broad": 0.5833,
+    "full": 0.9349,
+    "chroma_err": 0.0001,
+    "score": 0.8154,
+    "light_left_real": 0.4797
+   },
+   "seconds": 1.9
+  },
+  "R07": {
+   "name": "M13 puis M02 sur la pierre",
+   "phases": [
+    {
+     "param": 24,
+     "fine": 0.9907,
+     "mid": 0.9861,
+     "broad": 0.6612,
+     "full": 0.9518,
+     "chroma_err": 0.0001,
+     "score": 0.8502,
+     "light_left_real": 0.4248
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9859,
+     "broad": 0.6649,
+     "full": 0.9533,
+     "chroma_err": 0.0001,
+     "score": 0.8519,
+     "light_left_real": 0.4196
+    },
+    {
+     "param": 12,
+     "fine": 0.9907,
+     "mid": 0.9839,
+     "broad": 0.664,
+     "full": 0.9527,
+     "chroma_err": 0.0001,
+     "score": 0.8511,
+     "light_left_real": 0.4175
+    },
+    {
+     "param": 8,
+     "fine": 0.9907,
+     "mid": 0.9761,
+     "broad": 0.6615,
+     "full": 0.9499,
+     "chroma_err": 0.0001,
+     "score": 0.8479,
+     "light_left_real": 0.4161
+    }
+   ],
+   "best": {
+    "param": 16,
+    "fine": 0.9907,
+    "mid": 0.9859,
+    "broad": 0.6649,
+    "full": 0.9533,
+    "chroma_err": 0.0001,
+    "score": 0.8519,
+    "light_left_real": 0.4196
+   },
+   "seconds": 1.8
+  },
+  "R08": {
+   "name": "M13 au masque plus net puis M02 sur la pierre",
+   "phases": [
+    {
+     "param": 24,
+     "fine": 0.9907,
+     "mid": 0.9855,
+     "broad": 0.6177,
+     "full": 0.9465,
+     "chroma_err": 0.0001,
+     "score": 0.8316,
+     "light_left_real": 0.3731
+    },
+    {
+     "param": 16,
+     "fine": 0.9907,
+     "mid": 0.9845,
+     "broad": 0.6169,
+     "full": 0.9474,
+     "chroma_err": 0.0001,
+     "score": 0.8313,
+     "light_left_real": 0.3642
+    },
+    {
+     "param": 12,
+     "fine": 0.9907,
+     "mid": 0.9815,
+     "broad": 0.6147,
+     "full": 0.9465,
+     "chroma_err": 0.0001,
+     "score": 0.8296,
+     "light_left_real": 0.3606
+    },
+    {
+     "param": 8,
+     "fine": 0.9907,
+     "mid": 0.9707,
+     "broad": 0.6129,
+     "full": 0.9431,
+     "chroma_err": 0.0001,
+     "score": 0.826,
+     "light_left_real": 0.3581
+    }
+   ],
+   "best": {
+    "param": 24,
+    "fine": 0.9907,
+    "mid": 0.9855,
+    "broad": 0.6177,
+    "full": 0.9465,
+    "chroma_err": 0.0001,
+    "score": 0.8316,
+    "light_left_real": 0.3731
+   },
+   "seconds": 1.8
+  }
+ },
+ "bracket": [
+  {
+   "round": 1,
+   "a": "R01",
+   "b": "R02",
+   "score_a": 0.8252,
+   "score_b": 0.8254,
+   "winner": "R02"
+  },
+  {
+   "round": 1,
+   "a": "R03",
+   "b": "R04",
+   "score_a": 0.8334,
+   "score_b": 0.8387,
+   "winner": "R04"
+  },
+  {
+   "round": 1,
+   "a": "R05",
+   "b": "R06",
+   "score_a": 0.8391,
+   "score_b": 0.8154,
+   "winner": "R05"
+  },
+  {
+   "round": 1,
+   "a": "R07",
+   "b": "R08",
+   "score_a": 0.8519,
+   "score_b": 0.8316,
+   "winner": "R07"
+  },
+  {
+   "round": 2,
+   "a": "R02",
+   "b": "R04",
+   "score_a": 0.8254,
+   "score_b": 0.8387,
+   "winner": "R04"
+  },
+  {
+   "round": 2,
+   "a": "R05",
+   "b": "R07",
+   "score_a": 0.8391,
+   "score_b": 0.8519,
+   "winner": "R07"
+  },
+  {
+   "round": 3,
+   "a": "R04",
+   "b": "R07",
+   "score_a": 0.8387,
+   "score_b": 0.8519,
+   "winner": "R07"
+  }
+ ],
+ "winner": "R07"
+}

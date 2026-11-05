@@ -1,0 +1,22 @@
+{
+ "params": {
+  "relight_scale": 0.015625,
+  "levels": 3,
+  "matte_width": 0.35,
+  "surface_degree": 3,
+  "joint_k": 2.0,
+  "joint_scale": 0.015625,
+  "key_pct": 90,
+  "illum_scale": 0.125,
+  "steps": [
+   "relight",
+   "surface",
+   "exposure"
+  ]
+ },
+ "report": {
+  "detail_kept": 1.0,
+  "light_left": 0.4004,
+  "saturation_ratio": 1.0
+ }
+}

@@ -1,0 +1,27 @@
+# Tournoi de la luminosité des base colors (4 November 2026, 00:16 +0100)
+
+Demande de Matthieu : base color trop sombre et générations mal harmonisées ; aucune valeur absolue (« on ne peut pas toujours identifier le matériau ») ; au moins huit méthodes en tournoi (`zenray-methodology`). Entrées : trois générations ChatGPT de la base color de la 4 (b1, b2, b3), le panneau de référence éclairé et la height ChatGPT de la 4. Banc : `Scripts/BrightnessTournament.py`, planche `brightness_tournament_board.png`, mesures `brightness_tournament.json`. Toutes les cibles se mesurent sur les images. (4 November 2026)
+
+Critères fixés avant le tournoi (4 November 2026) : (1) la cible ne dépend que des images, et marche avec une seule génération ; (2) écart entre générations le plus bas ; (3) contraste propre de la matière gardé ; (4) part hors de la plage PBR des non-métaux, comme contrôle et non comme cible ; (5) concept lisible en une phrase par ChatGPT. Entrée : moyennes 98,9, 99,2 et 140,4 sRGB, écart 29,3. (4 November 2026)
+
+| Méthode | Principe | Moyennes sRGB | Écart | Contraste | Hors PBR |
+|---|---|---|---|---|---|
+| M1 | moyenne de la référence (le comportement actuel) | 111,4 | 5,49 | 1,0 | 0,0052 |
+| M2 | consensus des variantes | 114,9 | 5,64 | 1,0 | 0,0049 |
+| M3 | variante la mieux exposée | 140,3 | 6,76 | 1,0 | 0,0028 |
+| M4 | Retinex : réflectance de la référence exposée à sa lumière principale (p90 de l'illumination) | 138,5 | 6,68 | 1,0 | 0,0030 |
+| M5 | white patch : tons clairs p99 calés sur ceux de la zone éclairée | 155 à 166 | 10,29 | 1,0 | 0,0033 |
+| M6 | histogramme de la zone la mieux éclairée | 154,3 | 7,93 | 0,993 | 0,0012 |
+| M7 | sommets de la height, moins d'occlusion | 143,1 | 6,88 | 1,0 | 0,0028 |
+| M8 | niveaux relatifs (p2 à p98) de la zone éclairée | 156 à 160 | 7,99 | 1,0 | 0,0036 |
+
+## Le tableau (4 November 2026)
+
+- Quarts : M1 bat M2 (même noirceur, mais M2 exige plusieurs générations) ; M4 bat M3 (M3 dépend de la génération la plus chanceuse et ne change rien avec une seule) ; M6 bat M5 (M5 laisse les générations à des moyennes différentes, écart 10,29, le pire) ; M7 bat M8 (moyennes égales, écart 6,88 contre 7,99). (4 November 2026)
+- Demi-finales : M4 bat M1 (M1 garde la base color sombre, c'est le défaut constaté) ; M6 bat M7 (M7 exige une height alignée et un calcul peu lisible pour ChatGPT). (4 November 2026)
+- Finale : M4 bat M6. Écart plus bas (6,68 contre 7,93), contraste propre gardé (1,0 contre 0,993 : M6 impose la répartition de la zone éclairée de la référence, donc un peu de son éclairage), un seul gain en lumière linéaire qui garde teinte et saturation, et un concept en une phrase. M6 rend plus clair (154 contre 138,5) : à revoir si Matthieu juge M4 encore sombre. (4 November 2026)
+- Vainqueur provisoire : M4, Retinex à lumière principale. Le verdict final est visuel, à Matthieu. (4 November 2026)
+
+## Abandonné (4 November 2026)
+
+- Le calage sur un albédo chiffré (116, 135, 160 sRGB, version 3 du prompt) : valeur absolue, refusée par Matthieu. (4 November 2026)

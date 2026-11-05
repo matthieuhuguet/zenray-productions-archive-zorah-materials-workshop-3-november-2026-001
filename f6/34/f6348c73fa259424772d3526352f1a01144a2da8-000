@@ -1,0 +1,88 @@
+{
+ "M1 moyenne de la référence": {
+  "means_srgb": [
+   111.4,
+   111.4,
+   111.4
+  ],
+  "gap_between_generations": 5.49,
+  "outside_pbr_range": 0.0052,
+  "contrast_kept": 1.0
+ },
+ "M2 consensus des variantes": {
+  "means_srgb": [
+   114.9,
+   114.9,
+   114.9
+  ],
+  "gap_between_generations": 5.64,
+  "outside_pbr_range": 0.0049,
+  "contrast_kept": 1.0
+ },
+ "M3 variante la mieux exposée": {
+  "means_srgb": [
+   140.3,
+   140.3,
+   140.3
+  ],
+  "gap_between_generations": 6.76,
+  "outside_pbr_range": 0.0028,
+  "contrast_kept": 1.0
+ },
+ "M4 Retinex, lumière principale p90": {
+  "means_srgb": [
+   138.5,
+   138.5,
+   138.5
+  ],
+  "gap_between_generations": 6.68,
+  "outside_pbr_range": 0.003,
+  "contrast_kept": 1.0
+ },
+ "M5 white patch, tons clairs p99": {
+  "means_srgb": [
+   158.2,
+   155.2,
+   165.5
+  ],
+  "gap_between_generations": 10.29,
+  "outside_pbr_range": 0.0033,
+  "contrast_kept": 1.0
+ },
+ "M6 histogramme de la zone la mieux éclairée": {
+  "means_srgb": [
+   154.3,
+   154.3,
+   154.3
+  ],
+  "gap_between_generations": 7.93,
+  "outside_pbr_range": 0.0012,
+  "contrast_kept": 0.9934
+ },
+ "M7 sommets de la height (moins d'occlusion)": {
+  "means_srgb": [
+   143.1,
+   143.1,
+   143.1
+  ],
+  "gap_between_generations": 6.88,
+  "outside_pbr_range": 0.0028,
+  "contrast_kept": 1.0
+ },
+ "M8 niveaux relatifs sur la zone éclairée": {
+  "means_srgb": [
+   160.1,
+   156.4,
+   159.8
+  ],
+  "gap_between_generations": 7.99,
+  "outside_pbr_range": 0.0036,
+  "contrast_kept": 0.9999
+ },
+ "_reference": {
+  "mean_srgb": 111.4,
+  "p2": 47.7,
+  "p98": 183.8,
+  "outside_pbr_range": 0.0042
+ }
+}
